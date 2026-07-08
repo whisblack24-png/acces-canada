@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f8f6ef;
+  color: #0b1d36;
+}
+
+a {
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: #d4af37;
+  color: #0b1d36;
+}
+
+.glass {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.gold-ring {
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.3), 0 22px 55px rgba(11, 29, 54, 0.12);
+}
+
+.hero-mask {
+  background:
+    radial-gradient(circle at 72% 30%, rgba(212, 175, 55, 0.22), transparent 28%),
+    linear-gradient(90deg, rgba(11, 29, 54, 0.97) 0%, rgba(11, 29, 54, 0.8) 46%, rgba(11, 29, 54, 0.32) 100%),
+    linear-gradient(180deg, rgba(11, 29, 54, 0.12), rgba(11, 29, 54, 0.95));
+}
+
+.premium-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
