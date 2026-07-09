@@ -169,6 +169,16 @@ export async function listClientUploads(clientId: string) {
   return (await response.json()) as ClientUploadedDocument[];
 }
 
+export async function listAllClientUploads() {
+  const { url, key, uploadsTable } = config();
+  const response = await fetch(`${url}/rest/v1/${uploadsTable}?select=*&order=created_at.desc`, {
+    headers: headers(key),
+    cache: "no-store",
+  });
+  if (!response.ok) await fail("Liste globale documents clients", response);
+  return (await response.json()) as ClientUploadedDocument[];
+}
+
 export async function createClientUpload(record: Omit<ClientUploadedDocument, "id" | "created_at">) {
   const { url, key, uploadsTable } = config();
   const response = await fetch(`${url}/rest/v1/${uploadsTable}`, {

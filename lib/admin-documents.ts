@@ -45,9 +45,12 @@ function supabaseConfig() {
 }
 
 function headers(key: string) {
+  const authHeaders: Record<string, string> = key.startsWith("sb_secret_")
+    ? { apikey: key }
+    : { apikey: key, Authorization: `Bearer ${key}` };
+
   return {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
+    ...authHeaders,
     "Content-Type": "application/json",
   };
 }
