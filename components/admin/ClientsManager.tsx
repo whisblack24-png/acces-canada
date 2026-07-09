@@ -15,6 +15,7 @@ const emptyForm: ClientInput = {
   status: "nouveau",
   file_reference: "",
   notes: "",
+  public_notes: "",
   internal_notes: "",
   documents_received: [],
   documents_missing: [],
@@ -62,6 +63,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
       status: client.status,
       file_reference: client.file_reference || "",
       notes: client.notes || "",
+      public_notes: client.public_notes || "",
       internal_notes: client.internal_notes || client.notes || "",
       documents_received: client.documents_received || [],
       documents_missing: client.documents_missing || [],
@@ -230,6 +232,12 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
               type="number"
               value={String(form.paid_amount || 0)}
               onChange={(value) => setForm({ ...form, paid_amount: Number(value) })}
+            />
+
+            <Textarea
+              label="Notes publiques visibles par le client"
+              value={form.public_notes || ""}
+              onChange={(value) => setForm({ ...form, public_notes: value })}
             />
 
             <Textarea

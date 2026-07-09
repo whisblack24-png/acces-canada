@@ -18,6 +18,7 @@ export type AdminClient = {
   status: ClientStatus;
   file_reference: string | null;
   notes: string | null;
+  public_notes: string | null;
   internal_notes: string | null;
   documents_received: string[] | null;
   documents_missing: string[] | null;
@@ -34,6 +35,7 @@ export type ClientInput = {
   status: ClientStatus;
   file_reference?: string;
   notes?: string;
+  public_notes?: string;
   internal_notes?: string;
   documents_received?: string[];
   documents_missing?: string[];
@@ -119,6 +121,7 @@ function clientPayload(input: ClientInput, mode: "full" | "compatible" = "full")
     country: input.country || null,
     file_reference: input.file_reference || null,
     notes: input.notes || null,
+    public_notes: input.public_notes || null,
     internal_notes: input.internal_notes || null,
     documents_received: input.documents_received || [],
     documents_missing: input.documents_missing || [],
@@ -179,6 +182,7 @@ export function sanitizeClientInput(input: Partial<ClientInput>): ClientInput {
     status,
     file_reference: String(input.file_reference || "").trim().slice(0, 120) || undefined,
     notes: String(input.notes || "").trim().slice(0, 3000) || undefined,
+    public_notes: String(input.public_notes || "").trim().slice(0, 3000) || undefined,
     internal_notes: String(input.internal_notes || "").trim().slice(0, 3000) || undefined,
     documents_received: Array.isArray(input.documents_received)
       ? input.documents_received.map((item) => String(item).trim()).filter(Boolean).slice(0, 60)

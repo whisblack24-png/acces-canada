@@ -87,6 +87,23 @@ export async function listGeneratedDocuments() {
   return (await response.json()) as GeneratedDocument[];
 }
 
+export async function listGeneratedDocumentsForClient(clientId: string) {
+  const { url, key, table } = supabaseConfig();
+  const response = await fetch(
+    `${url}/rest/v1/${table}?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=created_at.desc`,
+    {
+      headers: headers(key),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw await supabaseError("Liste documents client", response);
+  }
+
+  return (await response.json()) as GeneratedDocument[];
+}
+
 export async function getGeneratedDocument(id: string) {
   const { url, key, table } = supabaseConfig();
   const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`, {

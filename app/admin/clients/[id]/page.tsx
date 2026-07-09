@@ -6,6 +6,7 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ClientDossierActions } from "@/components/admin/ClientDossierActions";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
+import { listClientUploads } from "@/lib/client-portal";
 import type { ServiceType } from "@/lib/admin-data";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
   const received = client.documents_received || [];
   const missing = client.documents_missing || [];
+  const uploadedDocuments = await listClientUploads(client.id).catch(() => []);
   const history = client.action_history?.length
     ? client.action_history
     : [{ date: client.created_at, action: "Dossier client cree dans le CRM." }];
@@ -89,6 +91,10 @@ export default async function ClientDossierPage({ params }: PageProps) {
               <Info label="Type de service" value={serviceLabels[client.service as ServiceType] || client.service} />
               <Info label="Statut" value={statusLabels[client.status] || client.status} />
               <div className="rounded-2xl bg-ivory p-4">
+                <span className="block text-xs font-black uppercase tracking-[0.16em] text-navy/42">Notes publiques</span>
+                <p className="mt-2 leading-7 text-navy/70">{client.public_notes || "Aucune note publique pour le client."}</p>
+              </div>
+              <div className="rounded-2xl bg-ivory p-4">
                 <span className="block text-xs font-black uppercase tracking-[0.16em] text-navy/42">Notes internes</span>
                 <p className="mt-2 leading-7 text-navy/70">{client.internal_notes || client.notes || "Aucune note interne pour ce dossier."}</p>
               </div>
@@ -112,6 +118,28 @@ export default async function ClientDossierPage({ params }: PageProps) {
                   </div>
                 ))}
               </div>
+            </Panel>
+
+            <Panel title="Documents envoyes par le client" icon={<FileCheck2 className="h-5 w-5" />}>
+              {uploadedDocuments.length ? (
+                <div className="space-y-2">
+                  {uploadedDocuments.map((document) => (
+                    <a
+                      key={document.id}
+                      href={`/api/admin/client-uploads/${document.id}/download?clientId=${client.id}`}
+                      className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74 transition hover:bg-gold/15"
+                    >
+                      <span>
+                        <span className="block">{document.file_name}</span>
+                        <span className="mt-1 block text-xs text-navy/42">{new Date(document.created_at).toLocaleDateString("fr-CA")}</span>
+                      </span>
+                      Telecharger
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document envoye par le client.</p>
+              )}
             </Panel>
           </div>
         </section>
