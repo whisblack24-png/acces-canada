@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { Footer } from "@/components/Footer";
-import { Navbar } from "@/components/Navbar";
-import { WhatsAppButton } from "@/components/WhatsAppButton";
+import { SiteChrome } from "@/components/SiteChrome";
 import { brand } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -58,10 +56,7 @@ export default function RootLayout({
   return (
     <html lang="fr-CA">
       <body className="font-sans antialiased">
-        <Navbar />
-        {children}
-        <Footer />
-        <WhatsAppButton />
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );
