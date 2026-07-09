@@ -87,12 +87,16 @@ function supabaseConfig() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const table = process.env.SUPABASE_CLIENTS_TABLE || "admin_clients";
+  const missing = [
+    !url || url.includes("TON-PROJET") ? "SUPABASE_URL" : "",
+    !key || key.includes("TA_SERVICE_ROLE_KEY") ? "SUPABASE_SERVICE_ROLE_KEY" : "",
+  ].filter(Boolean);
 
-  if (!url || !key) {
-    throw new Error("Configuration Supabase manquante pour l'espace admin.");
+  if (missing.length) {
+    throw new Error(`Configuration Supabase manquante pour l'espace admin: ${missing.join(", ")}.`);
   }
 
-  return { url, key, table };
+  return { url: url as string, key: key as string, table };
 }
 
 function headers(key: string) {

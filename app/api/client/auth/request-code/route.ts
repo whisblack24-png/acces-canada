@@ -65,6 +65,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Un code d'acces vient d'etre envoye a votre courriel." });
   } catch (error) {
     console.error("Erreur demande code client:", error);
-    return NextResponse.json({ message: "Impossible d'envoyer le code pour le moment." }, { status: 500 });
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("Variable d'environnement manquante")) {
+      return NextResponse.json({ message }, { status: 500 });
+    }
+
+    if (/SMTP|AUTH|535|534|Username|Password|credentials|authentication/i.test(message)) {
+      return NextResponse.json(
+        { message: "Impossible d'envoyer le code : Gmail/SMTP a refuse la connexion. Verifiez SMTP_USER et SMTP_PASS." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ message: "Impossible d'envoyer le code pour le moment. Verifiez la configuration Gmail SMTP." }, { status: 500 });
   }
 }
