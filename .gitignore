@@ -5,6 +5,7 @@ dist
 .env
 .env.local
 .env.*.local
+*.tsbuildinfo
 pnpm-lock.yaml
 npm-debug.log*
 yarn-debug.log*
