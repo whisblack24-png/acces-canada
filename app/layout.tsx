@@ -3,8 +3,10 @@ import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
 import { brand } from "@/lib/site";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://acces-canada.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://acces-canada.com"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "Accès Canada | Immigration, études et installation au Canada",
     template: "%s | Accès Canada"
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Accès Canada",
     description: brand.slogan,
-    url: "https://acces-canada.com",
+    url: siteUrl,
     siteName: "Accès Canada",
     images: [{ url: "/images/canada-skyline.png", width: 1200, height: 630, alt: "Canada skyline" }],
     locale: "fr_CA",

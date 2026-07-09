@@ -7,9 +7,9 @@ import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAdmin = pathname.startsWith("/admin");
+  const isSecurePortal = pathname.startsWith("/admin") || pathname.startsWith("/client");
 
-  if (isAdmin) {
+  if (isSecurePortal) {
     return <>{children}</>;
   }
 

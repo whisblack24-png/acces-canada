@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarCheck, Menu, Phone, X } from "lucide-react";
+import { CalendarCheck, LockKeyhole, Menu, Phone, X } from "lucide-react";
 import { useState } from "react";
 import { brand, navItems } from "@/lib/site";
 
@@ -41,6 +41,13 @@ export function Navbar() {
         </div>
 
         <div className="hidden items-center gap-2 lg:flex">
+          <Link
+            href="/client/login"
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-black text-white transition hover:border-gold hover:bg-white hover:text-navy"
+          >
+            <LockKeyhole className="h-4 w-4" />
+            Espace client
+          </Link>
           <Link
             href="/rendez-vous"
             className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-black text-navy transition hover:bg-white"
@@ -92,6 +99,14 @@ export function Navbar() {
             >
               <CalendarCheck className="h-4 w-4" />
               Prendre rendez-vous
+            </Link>
+            <Link
+              href="/client/login"
+              onClick={() => setOpen(false)}
+              className="mt-2 flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-black text-white"
+            >
+              <LockKeyhole className="h-4 w-4" />
+              Espace client
             </Link>
           </motion.div>
         ) : null}

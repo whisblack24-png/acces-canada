@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 
 export function ClientLoginForm() {
   const router = useRouter();
@@ -49,10 +51,20 @@ export function ClientLoginForm() {
 
   return (
     <div className="w-full max-w-xl rounded-[2rem] bg-white p-6 shadow-premium md:p-8">
+      <div className="mb-7 flex items-center justify-between gap-4">
+        <Image src="/images/logo.png" alt="Accès Canada" width={58} height={58} className="h-14 w-14 rounded-2xl" />
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 rounded-full border border-navy/10 px-4 py-2 text-xs font-black text-navy/70 transition hover:border-gold hover:text-navy"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Site officiel
+        </Link>
+      </div>
       <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Portail client</p>
-      <h1 className="mt-3 font-display text-4xl font-black text-navy">Connexion securisee</h1>
+      <h1 className="mt-3 font-display text-4xl font-black text-navy">Connexion sécurisée</h1>
       <p className="mt-4 leading-7 text-navy/60">
-        Entrez le courriel associe a votre dossier. Un code temporaire vous sera envoye pour proteger votre acces.
+        Entrez le courriel associé à votre dossier. Un code temporaire vous sera envoyé pour protéger votre accès.
       </p>
 
       {step === "email" ? (
@@ -76,7 +88,7 @@ export function ClientLoginForm() {
       ) : (
         <form onSubmit={verifyCode} className="mt-6 space-y-4">
           <label className="block text-sm font-bold text-navy/70">
-            Code recu par courriel
+            Code reçu par courriel
             <input
               inputMode="numeric"
               required
@@ -88,7 +100,7 @@ export function ClientLoginForm() {
           {feedback ? <p className="rounded-2xl bg-gold/15 px-4 py-3 text-sm font-bold text-navy">{feedback}</p> : null}
           <button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-canada px-5 py-3 text-sm font-black text-white transition hover:bg-navy disabled:bg-navy/40">
             <ShieldCheck className="h-4 w-4" />
-            {loading ? "Verification..." : "Acceder au portail"}
+            {loading ? "Vérification..." : "Accéder au portail"}
           </button>
         </form>
       )}

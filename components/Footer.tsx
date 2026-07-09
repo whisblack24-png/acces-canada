@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, LockKeyhole } from "lucide-react";
 import { brand, contactMethods, navItems, services } from "@/lib/site";
 
 export function Footer() {
@@ -29,6 +29,9 @@ export function Footer() {
                 {item.label}
               </Link>
             ))}
+            <Link href="/client/login" className="block text-sm font-bold text-gold transition hover:text-white">
+              Espace client
+            </Link>
           </div>
         </div>
 
@@ -53,13 +56,22 @@ export function Footer() {
               </a>
             ))}
           </div>
-          <Link
-            href="/contact"
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-black text-navy transition hover:bg-white"
-          >
-            Consultation
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+            <Link
+              href="/contact"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-black text-navy transition hover:bg-white"
+            >
+              Consultation
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/client/login"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 px-5 py-3 text-sm font-black text-white transition hover:border-gold hover:bg-white hover:text-navy"
+            >
+              <LockKeyhole className="h-4 w-4" />
+              Espace client
+            </Link>
+          </div>
         </div>
       </div>
       <div className="border-t border-white/10 px-6 py-5 text-center text-xs text-white/48">

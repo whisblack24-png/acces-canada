@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarCheck, ArrowRight } from "lucide-react";
+import { CalendarCheck, ArrowRight, LockKeyhole } from "lucide-react";
 
 export default function Home() {
   return (
@@ -16,7 +16,7 @@ export default function Home() {
           <p className="mt-6 max-w-3xl text-lg leading-8 text-white/82 md:text-xl">
             Cabinet professionnel spécialisé en immigration, études, permis de travail et accompagnement vers le Canada.
           </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap">
             <Link
               href="/rendez-vous"
               className="inline-flex min-h-12 items-center gap-2 rounded-full bg-gold px-8 py-4 text-sm font-black text-navy shadow-[0_18px_45px_rgba(212,175,55,0.26)] transition hover:-translate-y-1 hover:bg-white"
@@ -30,6 +30,13 @@ export default function Home() {
             >
               Nos services
               <ArrowRight className="h-5 w-5" />
+            </Link>
+            <Link
+              href="/client/login"
+              className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-sm font-black text-white backdrop-blur transition hover:-translate-y-1 hover:bg-white hover:text-navy"
+            >
+              <LockKeyhole className="h-5 w-5" />
+              Espace client
             </Link>
           </div>
         </div>
@@ -60,13 +67,22 @@ export default function Home() {
           <p className="mx-auto mt-4 max-w-2xl leading-8 text-white/68">
             Réservez une consultation en ligne et échangez avec Accès Canada sur votre parcours.
           </p>
-          <Link
-            href="/rendez-vous"
-            className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-full bg-canada px-8 py-4 text-sm font-black text-white transition hover:-translate-y-1 hover:bg-gold hover:text-navy"
-          >
-            <CalendarCheck className="h-5 w-5" />
-            Prendre rendez-vous
-          </Link>
+          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/rendez-vous"
+              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-canada px-8 py-4 text-sm font-black text-white transition hover:-translate-y-1 hover:bg-gold hover:text-navy"
+            >
+              <CalendarCheck className="h-5 w-5" />
+              Prendre rendez-vous
+            </Link>
+            <Link
+              href="/client/login"
+              className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/20 px-8 py-4 text-sm font-black text-white transition hover:-translate-y-1 hover:bg-white hover:text-navy"
+            >
+              <LockKeyhole className="h-5 w-5" />
+              Accéder à mon dossier
+            </Link>
+          </div>
         </div>
       </section>
     </main>

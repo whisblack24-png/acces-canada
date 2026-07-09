@@ -27,10 +27,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-navy/10 bg-navy text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-5 md:flex-row md:items-center md:justify-between">
           <Link href="/client/dashboard" className="flex items-center gap-3">
-            <Image src="/images/logo.png" alt="Acces Canada" width={52} height={52} className="h-12 w-12 rounded-2xl" />
+            <Image src="/images/logo.png" alt="Accès Canada" width={52} height={52} className="h-12 w-12 rounded-2xl" />
             <span>
               <span className="block font-black">{brand.name}</span>
-              <span className="block text-xs font-semibold text-white/52">Espace client securise</span>
+              <span className="block text-xs font-semibold text-white/52">Espace client sécurisé</span>
             </span>
           </Link>
           <nav className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
@@ -55,7 +55,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-black text-white/76"
             >
               <LogOut className="h-4 w-4" />
-              Sortir
+              Déconnexion
             </button>
           </nav>
         </div>

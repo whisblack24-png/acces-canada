@@ -31,3 +31,17 @@ Then open `http://localhost:3000`.
 
 - Logo: `public/images/logo.png`
 - Skyline hero: `public/images/canada-skyline.png`
+
+## Production Vercel
+
+Configure all variables from `.env.example` in Vercel for Production, Preview, and Development as needed.
+
+For the future custom domain, set:
+
+```bash
+NEXT_PUBLIC_SITE_URL=https://your-custom-domain.com
+```
+
+Then add the domain in Vercel under Project Settings > Domains and follow the DNS instructions shown by Vercel.
+
+Never commit `.env.local`; keep Supabase service role keys, Gmail app passwords, and session secrets only in Vercel environment variables.
