@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { CalendarCheck, Clock, ShieldCheck } from "lucide-react";
+import { CalendlyBooking } from "@/components/CalendlyBooking";
 import { InteriorHero } from "@/components/InteriorHero";
 import { Reveal } from "@/components/Reveal";
 import { brand } from "@/lib/site";
@@ -28,6 +28,11 @@ export default function AppointmentPage() {
               Le calendrier ci-contre vous permet de réserver une consultation de 30 minutes avec Accès Canada. Après la
               réservation, vous recevrez automatiquement les informations du rendez-vous.
             </p>
+            <p className="mt-4 rounded-2xl border border-gold/25 bg-white/8 p-4 text-sm leading-6 text-white/68">
+              Toute l'expérience que nous contrôlons est présentée en français. Si Calendly affiche une étape système
+              dans une autre langue, le message de confirmation Accès Canada s'affichera ici en français après la
+              réservation.
+            </p>
 
             <div className="mt-8 space-y-4">
               {[
@@ -54,19 +59,10 @@ export default function AppointmentPage() {
           </Reveal>
 
           <Reveal delay={0.08} className="overflow-hidden rounded-[2rem] border border-navy/10 bg-white shadow-premium">
-            <div className="border-b border-navy/10 px-5 py-4 md:px-7">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Calendrier Calendly</p>
-            </div>
-            <div
-              className="calendly-inline-widget min-w-[320px]"
-              data-url="https://calendly.com/accesc625/30min"
-              style={{ height: "700px" }}
-            />
+            <CalendlyBooking />
           </Reveal>
         </div>
       </section>
-
-      <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="afterInteractive" />
     </main>
   );
 }
