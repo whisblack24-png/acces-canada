@@ -1,14 +1,51 @@
 import type { AdminClient, ServiceType } from "@/lib/admin-data";
 import { serviceLabels, statusLabels } from "@/lib/admin-data";
 
-export type ClientDocumentType = "convention" | "reconnaissance-dette" | "checklist-visa" | "facture";
+export type ClientDocumentType =
+  | "convention"
+  | "reconnaissance-dette"
+  | "checklist-visa"
+  | "facture"
+  | "lettre-explicative"
+  | "lettre-soutien-financier"
+  | "lettre-invitation"
+  | "recu-paiement";
 
-const documentLabels: Record<ClientDocumentType, string> = {
+export type DocumentGenerationOptions = {
+  includePersonalInfo?: boolean;
+  includeContactInfo?: boolean;
+  includeServiceInfo?: boolean;
+  includeDocuments?: boolean;
+  includeNotes?: boolean;
+  includePayments?: boolean;
+  includeSignatures?: boolean;
+};
+
+export const documentLabels: Record<ClientDocumentType, string> = {
   convention: "Convention de services",
   "reconnaissance-dette": "Reconnaissance de dette",
   "checklist-visa": "Liste de verification visa",
   facture: "Facture client",
+  "lettre-explicative": "Lettre explicative",
+  "lettre-soutien-financier": "Lettre de soutien financier",
+  "lettre-invitation": "Lettre d'invitation",
+  "recu-paiement": "Recu de paiement",
 };
+
+export const documentLibrary: { type: ClientDocumentType; label: string; description: string }[] = [
+  { type: "convention", label: documentLabels.convention, description: "Cadre professionnel de prestation et responsabilites." },
+  { type: "reconnaissance-dette", label: documentLabels["reconnaissance-dette"], description: "Modalites de paiement et engagement financier." },
+  { type: "checklist-visa", label: documentLabels["checklist-visa"], description: "Documents recus, manquants et suivi du dossier." },
+  { type: "facture", label: documentLabels.facture, description: "Facturation client avec montant, taxes et statut." },
+  { type: "lettre-explicative", label: documentLabels["lettre-explicative"], description: "Lettre narrative pour clarifier le projet du demandeur." },
+  {
+    type: "lettre-soutien-financier",
+    label: documentLabels["lettre-soutien-financier"],
+    description: "Modele de soutien financier adapte au dossier client.",
+  },
+  { type: "lettre-invitation", label: documentLabels["lettre-invitation"], description: "Lettre d'invitation pour visite temporaire au Canada." },
+  { type: "recu-paiement", label: documentLabels["recu-paiement"], description: "Preuve de paiement professionnelle pour le client." },
+];
 
 function safe(value: string | number | null | undefined) {
   return String(value ?? "")
@@ -29,19 +66,61 @@ function money(value: number | null | undefined) {
   return `${Number(value || 0).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
 }
 
-function baseInfo(client: AdminClient) {
-  return [
-    ["Client", client.full_name],
-    ["Courriel", client.email],
-    ["Telephone", client.phone || "Non renseigne"],
-    ["Pays", client.country || "Non renseigne"],
-    ["Service", serviceLabels[client.service as ServiceType] || client.service],
-    ["Statut", statusLabels[client.status] || client.status],
-    ["Reference dossier", client.file_reference || "A creer"],
-  ];
+function baseInfo(client: AdminClient, options: DocumentGenerationOptions = {}) {
+  const include = {
+    includePersonalInfo: true,
+    includeContactInfo: true,
+    includeServiceInfo: true,
+    ...options,
+  };
+  const rows: [string, string][] = [];
+
+  if (include.includePersonalInfo) {
+    rows.push(["Client", client.full_name], ["Pays", client.country || "Non renseigne"]);
+  }
+
+  if (include.includeContactInfo) {
+    rows.push(["Courriel", client.email], ["Telephone", client.phone || "Non renseigne"]);
+  }
+
+  if (include.includeServiceInfo) {
+    rows.push(
+      ["Service", serviceLabels[client.service as ServiceType] || client.service],
+      ["Statut", statusLabels[client.status] || client.status],
+      ["Reference dossier", client.file_reference || "A creer"],
+    );
+  }
+
+  return rows;
 }
 
-function linesFor(client: AdminClient, type: ClientDocumentType) {
+function notesRows(client: AdminClient, options: DocumentGenerationOptions) {
+  return options.includeNotes
+    ? ([["section", "Notes internes"], ["Texte", client.internal_notes || client.notes || "Aucune note particuliere."]] as [string, string][])
+    : [];
+}
+
+function signatureRows(options: DocumentGenerationOptions) {
+  return options.includeSignatures === false
+    ? []
+    : ([
+        ["section", "Signatures"],
+        ["Client", "Signature: ____________________________   Date: ____________"],
+        ["Acces Canada", "Signature: ____________________________   Date: ____________"],
+      ] as [string, string][]);
+}
+
+function linesFor(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}) {
+  const settings: DocumentGenerationOptions = {
+    includePersonalInfo: true,
+    includeContactInfo: true,
+    includeServiceInfo: true,
+    includeDocuments: true,
+    includeNotes: true,
+    includePayments: true,
+    includeSignatures: true,
+    ...options,
+  };
   const issued = dateFr(new Date().toISOString());
   const received = client.documents_received?.length ? client.documents_received : ["Aucun document marque comme recu"];
   const missing = client.documents_missing?.length ? client.documents_missing : ["Aucun document marque comme manquant"];
@@ -49,7 +128,7 @@ function linesFor(client: AdminClient, type: ClientDocumentType) {
   if (type === "convention") {
     return [
       ["section", "Informations du dossier"],
-      ...baseInfo(client),
+      ...baseInfo(client, settings),
       ["section", "Objet de la convention"],
       [
         "Texte",
@@ -58,17 +137,16 @@ function linesFor(client: AdminClient, type: ClientDocumentType) {
       ["section", "Engagements"],
       ["Texte", "Le client s'engage a fournir des renseignements exacts, complets et verifiables."],
       ["Texte", "Acces Canada assure un suivi professionnel, confidentiel et conforme aux informations communiquees."],
-      ["section", "Signatures"],
-      ["Client", "Signature: ____________________________   Date: ____________"],
-      ["Acces Canada", "Signature: ____________________________   Date: ____________"],
+      ...notesRows(client, settings),
+      ...signatureRows(settings),
     ];
   }
 
   if (type === "reconnaissance-dette") {
     return [
       ["section", "Informations du client"],
-      ...baseInfo(client),
-      ["Montant deja paye", money(client.paid_amount)],
+      ...baseInfo(client, settings),
+      ...(settings.includePayments ? ([["Montant deja paye", money(client.paid_amount)]] as [string, string][]) : []),
       ["section", "Modalites de paiement"],
       ["Texte", "Le client reconnait devoir les montants restant dus selon les conditions convenues avec Acces Canada."],
       ["Texte", "Tout retard de paiement peut suspendre le traitement administratif du dossier jusqu'a regularisation."],
@@ -76,22 +154,87 @@ function linesFor(client: AdminClient, type: ClientDocumentType) {
       ["Paiement 1", "Date: ____________   Montant: ____________   Mode: ____________"],
       ["Paiement 2", "Date: ____________   Montant: ____________   Mode: ____________"],
       ["Paiement 3", "Date: ____________   Montant: ____________   Mode: ____________"],
-      ["section", "Signatures"],
-      ["Client", "Signature: ____________________________   Date: ____________"],
-      ["Acces Canada", "Signature: ____________________________   Date: ____________"],
+      ...signatureRows(settings),
     ];
   }
 
   if (type === "checklist-visa") {
     return [
       ["section", "Informations du dossier"],
-      ...baseInfo(client),
-      ["section", "Documents recus"],
-      ...received.map((item) => ["[x]", item] as [string, string]),
-      ["section", "Documents manquants"],
-      ...missing.map((item) => ["[ ]", item] as [string, string]),
+      ...baseInfo(client, settings),
+      ...(settings.includeDocuments
+        ? ([
+            ["section", "Documents recus"],
+            ...received.map((item) => ["[x]", item] as [string, string]),
+            ["section", "Documents manquants"],
+            ...missing.map((item) => ["[ ]", item] as [string, string]),
+          ] as [string, string][])
+        : []),
       ["section", "Suivi"],
       ["Texte", "Cette liste est mise a jour selon les documents transmis par le client et les exigences du type de demande."],
+      ...notesRows(client, settings),
+    ];
+  }
+
+  if (type === "lettre-explicative") {
+    return [
+      ["section", "Objet"],
+      ["Texte", "Cette lettre vise a presenter clairement le contexte, le projet et les elements administratifs du dossier."],
+      ["section", "Informations du demandeur"],
+      ...baseInfo(client, settings),
+      ["section", "Declaration"],
+      [
+        "Texte",
+        "Le demandeur souhaite soumettre un dossier complet, coherent et conforme aux exigences applicables. Les informations fournies devront etre accompagnees des pieces justificatives pertinentes.",
+      ],
+      ...notesRows(client, settings),
+      ...signatureRows(settings),
+    ];
+  }
+
+  if (type === "lettre-soutien-financier") {
+    return [
+      ["section", "Objet"],
+      ["Texte", "Cette lettre confirme l'intention de soutien financier dans le cadre du projet d'immigration ou de sejour au Canada."],
+      ["section", "Beneficiaire"],
+      ...baseInfo(client, settings),
+      ["section", "Engagement"],
+      [
+        "Texte",
+        "Le signataire confirme etre dispose a soutenir financierement le beneficiaire selon les besoins du dossier et les justificatifs presentes.",
+      ],
+      ...(settings.includePayments ? ([["Montant de reference", money(client.paid_amount)]] as [string, string][]) : []),
+      ...signatureRows(settings),
+    ];
+  }
+
+  if (type === "lettre-invitation") {
+    return [
+      ["section", "Objet"],
+      ["Texte", "Cette lettre est preparee pour soutenir une invitation temporaire au Canada, sous reserve des renseignements fournis."],
+      ["section", "Personne invitee"],
+      ...baseInfo(client, settings),
+      ["section", "Contexte de l'invitation"],
+      [
+        "Texte",
+        "L'invitation devra preciser le lien avec l'hote, la duree prevue du sejour, l'adresse d'accueil et les responsabilites pendant le sejour.",
+      ],
+      ...signatureRows(settings),
+    ];
+  }
+
+  if (type === "recu-paiement") {
+    return [
+      ["Recu", `RECU-${client.id.slice(0, 8).toUpperCase()}`],
+      ["Date", issued],
+      ["section", "Client"],
+      ...baseInfo(client, settings),
+      ["section", "Paiement"],
+      ["Montant recu", money(client.paid_amount)],
+      ["Mode de paiement", "A confirmer"],
+      ["Description", serviceLabels[client.service as ServiceType] || client.service],
+      ["section", "Confirmation"],
+      ["Texte", "Acces Canada confirme la reception du paiement indique pour le dossier mentionne ci-dessus."],
     ];
   }
 
@@ -101,7 +244,7 @@ function linesFor(client: AdminClient, type: ClientDocumentType) {
     ["Date d'emission", issued],
     ["Statut", subtotal > 0 ? "Payee / acompte recu" : "En attente"],
     ["section", "Client"],
-    ...baseInfo(client),
+    ...baseInfo(client, settings),
     ["section", "Services"],
     [serviceLabels[client.service as ServiceType] || client.service, money(subtotal)],
     ["Sous-total", money(subtotal)],
@@ -110,7 +253,7 @@ function linesFor(client: AdminClient, type: ClientDocumentType) {
     ["section", "Mode de paiement"],
     ["Texte", "A completer ulterieurement par Acces Canada."],
     ["section", "Remarques"],
-    ["Texte", client.internal_notes || client.notes || "Merci pour votre confiance."],
+    ...(settings.includeNotes ? ([["Texte", client.internal_notes || client.notes || "Merci pour votre confiance."]] as [string, string][]) : []),
   ];
 }
 
@@ -119,9 +262,9 @@ function writeObject(parts: string[], index: number, body: string, offsets: numb
   parts.push(`${index} 0 obj\n${body}\nendobj\n`);
 }
 
-export function generateClientPdf(client: AdminClient, type: ClientDocumentType) {
+export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}) {
   const title = documentLabels[type];
-  const rows = linesFor(client, type);
+  const rows = linesFor(client, type, options);
   const content: string[] = [];
   let y = 760;
 

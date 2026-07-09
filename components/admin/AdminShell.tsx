@@ -9,7 +9,7 @@ import { brand } from "@/lib/site";
 const adminNav = [
   { label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
   { label: "Clients", href: "/admin/clients", icon: UsersRound },
-  { label: "Documents", href: "/admin/documents", icon: FileText, disabled: true },
+  { label: "Documents", href: "/admin/documents", icon: FileText },
   { label: "Rapports", href: "/admin/rapports", icon: BarChart3, disabled: true },
 ];
 
