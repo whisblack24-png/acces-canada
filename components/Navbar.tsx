@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Menu, Phone, X } from "lucide-react";
+import { CalendarCheck, Menu, Phone, X } from "lucide-react";
 import { useState } from "react";
 import { brand, navItems } from "@/lib/site";
 
@@ -40,13 +40,22 @@ export function Navbar() {
           })}
         </div>
 
-        <a
-          href={`tel:${brand.phone.replaceAll(" ", "")}`}
-          className="hidden items-center gap-2 rounded-full border border-gold/40 px-4 py-2 text-sm font-black text-gold transition hover:bg-gold hover:text-navy lg:inline-flex"
-        >
-          <Phone className="h-4 w-4" />
-          {brand.phone}
-        </a>
+        <div className="hidden items-center gap-2 lg:flex">
+          <Link
+            href="/rendez-vous"
+            className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-black text-navy transition hover:bg-white"
+          >
+            <CalendarCheck className="h-4 w-4" />
+            Prendre rendez-vous
+          </Link>
+          <a
+            href={`tel:${brand.phone.replaceAll(" ", "")}`}
+            className="inline-flex items-center gap-2 rounded-full border border-gold/40 px-4 py-2 text-sm font-black text-gold transition hover:bg-gold hover:text-navy"
+          >
+            <Phone className="h-4 w-4" />
+            {brand.phone}
+          </a>
+        </div>
 
         <button
           type="button"
@@ -76,6 +85,14 @@ export function Navbar() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/rendez-vous"
+              onClick={() => setOpen(false)}
+              className="mt-2 flex items-center justify-center gap-2 rounded-2xl bg-gold px-4 py-3 text-sm font-black text-navy"
+            >
+              <CalendarCheck className="h-4 w-4" />
+              Prendre rendez-vous
+            </Link>
           </motion.div>
         ) : null}
       </AnimatePresence>
