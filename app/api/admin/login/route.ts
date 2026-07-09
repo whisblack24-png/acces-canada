@@ -10,6 +10,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Mot de passe administrateur invalide." }, { status: 401 });
   }
 
-  await setAdminSession();
-  return NextResponse.json({ message: "Connexion réussie." });
+  return setAdminSession(NextResponse.json({ message: "Connexion réussie." }));
 }

@@ -67,7 +67,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
   }
 
   async function refresh() {
-    const response = await fetch("/api/admin/clients");
+    const response = await fetch("/api/admin/clients", { credentials: "include" });
     const result = (await response.json()) as { clients?: AdminClient[] };
     setClients(result.clients || []);
     setSelected((current) => result.clients?.find((client) => client.id === current?.id) || result.clients?.[0] || null);
@@ -81,6 +81,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
     const response = await fetch(editingId ? `/api/admin/clients/${editingId}` : "/api/admin/clients", {
       method: editingId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(form),
     });
 
@@ -100,7 +101,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
   async function remove(client: AdminClient) {
     if (!window.confirm(`Supprimer ${client.full_name} ?`)) return;
 
-    const response = await fetch(`/api/admin/clients/${client.id}`, { method: "DELETE" });
+    const response = await fetch(`/api/admin/clients/${client.id}`, { method: "DELETE", credentials: "include" });
     if (!response.ok) {
       setFeedback("Impossible de supprimer le client.");
       return;

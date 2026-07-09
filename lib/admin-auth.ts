@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export const ADMIN_COOKIE = "acces_canada_admin";
 
@@ -20,7 +21,23 @@ function safeEqual(a: string, b: string) {
 }
 
 function useSecureCookie() {
-  return process.env.VERCEL === "1" || process.env.VERCEL === "true";
+  if (process.env.ADMIN_COOKIE_SECURE === "false") {
+    return false;
+  }
+
+  if (process.env.ADMIN_COOKIE_SECURE === "true") {
+    return true;
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
+function encode(value: string) {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+function decode(value: string) {
+  return Buffer.from(value, "base64url").toString("utf8");
 }
 
 export function verifyAdminPassword(password: string) {
@@ -33,47 +50,88 @@ export function verifyAdminPassword(password: string) {
 
 export function createAdminSessionValue() {
   const expiresAt = Date.now() + maxAgeSeconds * 1000;
-  const payload = `admin:${expiresAt}`;
+  const payload = encode(JSON.stringify({ role: "admin", expiresAt }));
   return `${payload}.${sign(payload)}`;
+}
+
+export function verifyAdminSessionValue(session: string | undefined) {
+  if (!session) {
+    return false;
+  }
+
+  const separator = session.lastIndexOf(".");
+  if (separator <= 0) {
+    return verifyLegacySessionValue(session);
+  }
+
+  const payload = session.slice(0, separator);
+  const signature = session.slice(separator + 1);
+
+  if (!payload || !signature || !safeEqual(signature, sign(payload))) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(decode(payload)) as { role?: string; expiresAt?: number };
+    return parsed.role === "admin" && Number(parsed.expiresAt) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function verifyLegacySessionValue(session: string) {
+  const separator = session.lastIndexOf(".");
+  if (separator <= 0) {
+    return false;
+  }
+
+  const payload = session.slice(0, separator);
+  const signature = session.slice(separator + 1);
+  const [role, expiresAt] = payload.split(":");
+
+  if (role !== "admin" || !expiresAt || !signature || Number(expiresAt) < Date.now()) {
+    return false;
+  }
+
+  return safeEqual(signature, sign(payload));
 }
 
 export async function isAdminAuthenticated() {
   const store = await cookies();
   const session = store.get(ADMIN_COOKIE)?.value;
-  if (!session) {
-    return false;
-  }
-
-  const [role, expiresAt, signature] = session.split(/[.:]/);
-  if (role !== "admin" || !expiresAt || !signature) {
-    return false;
-  }
-
-  if (Number(expiresAt) < Date.now()) {
-    return false;
-  }
-
-  return safeEqual(signature, sign(`${role}:${expiresAt}`));
+  return verifyAdminSessionValue(session);
 }
 
-export async function setAdminSession() {
-  const store = await cookies();
-  store.set(ADMIN_COOKIE, createAdminSessionValue(), {
+export function setAdminSession(response: NextResponse) {
+  response.cookies.set(ADMIN_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: useSecureCookie(),
+    path: "/admin",
+    maxAge: 0,
+    expires: new Date(0),
+  });
+
+  response.cookies.set(ADMIN_COOKIE, createAdminSessionValue(), {
     httpOnly: true,
     sameSite: "lax",
     secure: useSecureCookie(),
     path: "/",
     maxAge: maxAgeSeconds,
   });
+  return response;
 }
 
-export async function clearAdminSession() {
-  const store = await cookies();
-  store.set(ADMIN_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: useSecureCookie(),
-    path: "/",
-    maxAge: 0,
-  });
+export function clearAdminSession(response: NextResponse) {
+  for (const path of ["/", "/admin"]) {
+    response.cookies.set(ADMIN_COOKIE, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: useSecureCookie(),
+      path,
+      maxAge: 0,
+      expires: new Date(0),
+    });
+  }
+  return response;
 }
