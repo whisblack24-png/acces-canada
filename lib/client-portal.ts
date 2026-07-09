@@ -30,7 +30,20 @@ function config() {
 }
 
 function headers(key: string) {
-  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+  return {
+    ...supabaseAuthHeaders(key),
+    "Content-Type": "application/json",
+  };
+}
+
+function supabaseAuthHeaders(key: string) {
+  const base = { apikey: key };
+
+  if (key.startsWith("sb_secret_")) {
+    return base;
+  }
+
+  return { ...base, Authorization: `Bearer ${key}` };
 }
 
 function encodeStoragePath(path: string) {
@@ -56,7 +69,7 @@ async function ensureClientDocumentsBucket() {
   };
 
   const readResponse = await fetch(bucketUrl, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    headers: supabaseAuthHeaders(key),
     cache: "no-store",
   });
 
@@ -206,8 +219,7 @@ export async function uploadClientFile(clientId: string, file: File) {
   const response = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodedPath}`, {
     method: "POST",
     headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      ...supabaseAuthHeaders(key),
       "Content-Type": file.type || "application/octet-stream",
       "x-upsert": "false",
     },
@@ -229,7 +241,7 @@ export async function downloadClientFile(clientId: string, uploadId: string) {
   if (!record) return null;
 
   const fileResponse = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(record.file_path)}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    headers: supabaseAuthHeaders(key),
     cache: "no-store",
   });
   if (!fileResponse.ok) await fail("Telechargement fichier client", fileResponse);
@@ -249,7 +261,7 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
 
   const storageResponse = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(record.file_path)}`, {
     method: "DELETE",
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    headers: supabaseAuthHeaders(key),
   });
   if (!storageResponse.ok && storageResponse.status !== 404) {
     await fail("Suppression fichier client", storageResponse);
