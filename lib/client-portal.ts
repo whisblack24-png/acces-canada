@@ -11,6 +11,9 @@ export type ClientUploadedDocument = {
   file_size: number | null;
 };
 
+const clientDocumentMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
+const clientDocumentMaxSize = 8 * 1024 * 1024;
+
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -30,8 +33,69 @@ function headers(key: string) {
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 }
 
+function encodeStoragePath(path: string) {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
 async function fail(action: string, response: Response) {
-  throw new Error(`${action} Supabase echouee (${response.status}) : ${await response.text()}`);
+  const details = await response.text();
+  console.error(`[Supabase portail client] ${action} echouee`, {
+    status: response.status,
+    details,
+  });
+  throw new Error(`${action} Supabase echouee (${response.status}) : ${details}`);
+}
+
+async function ensureClientDocumentsBucket() {
+  const { url, key, bucket } = config();
+  const bucketUrl = `${url}/storage/v1/bucket/${encodeURIComponent(bucket)}`;
+  const bucketPayload = {
+    public: false,
+    file_size_limit: clientDocumentMaxSize,
+    allowed_mime_types: clientDocumentMimeTypes,
+  };
+
+  const readResponse = await fetch(bucketUrl, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    cache: "no-store",
+  });
+
+  if (readResponse.ok) {
+    const updateResponse = await fetch(bucketUrl, {
+      method: "PUT",
+      headers: headers(key),
+      body: JSON.stringify(bucketPayload),
+    });
+    if (!updateResponse.ok) await fail("Configuration bucket documents client", updateResponse);
+    return;
+  }
+
+  if (readResponse.status !== 404) {
+    await fail("Verification bucket documents client", readResponse);
+  }
+
+  const createResponse = await fetch(`${url}/storage/v1/bucket`, {
+    method: "POST",
+    headers: headers(key),
+    body: JSON.stringify({
+      id: bucket,
+      name: bucket,
+      ...bucketPayload,
+    }),
+  });
+
+  if (!createResponse.ok && createResponse.status !== 409) {
+    await fail("Creation bucket documents client", createResponse);
+  }
+
+  if (createResponse.status === 409) {
+    const updateResponse = await fetch(bucketUrl, {
+      method: "PUT",
+      headers: headers(key),
+      body: JSON.stringify(bucketPayload),
+    });
+    if (!updateResponse.ok) await fail("Configuration bucket documents client", updateResponse);
+  }
 }
 
 export async function findClientByEmail(email: string) {
@@ -134,10 +198,12 @@ export async function markClientUploadReceived(clientId: string, fileName: strin
 
 export async function uploadClientFile(clientId: string, file: File) {
   const { url, key, bucket } = config();
+  await ensureClientDocumentsBucket();
   const extension = file.name.split(".").pop()?.toLowerCase() || "file";
   const cleanName = file.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "-");
   const path = `${clientId}/${Date.now()}-${cleanName || `document.${extension}`}`;
-  const response = await fetch(`${url}/storage/v1/object/${bucket}/${path}`, {
+  const encodedPath = encodeStoragePath(path);
+  const response = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodedPath}`, {
     method: "POST",
     headers: {
       apikey: key,
@@ -162,7 +228,7 @@ export async function downloadClientFile(clientId: string, uploadId: string) {
   const record = records[0];
   if (!record) return null;
 
-  const fileResponse = await fetch(`${url}/storage/v1/object/${bucket}/${record.file_path}`, {
+  const fileResponse = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(record.file_path)}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
     cache: "no-store",
   });
@@ -181,7 +247,7 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
   const record = records[0];
   if (!record) return null;
 
-  const storageResponse = await fetch(`${url}/storage/v1/object/${bucket}/${record.file_path}`, {
+  const storageResponse = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(record.file_path)}`, {
     method: "DELETE",
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
