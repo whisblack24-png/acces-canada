@@ -45,6 +45,10 @@ async function sendCode(email: string, name: string, code: string) {
   });
 }
 
+function canShowDevCode() {
+  return process.env.NODE_ENV !== "production" || process.env.CLIENT_DEV_EMAIL_FALLBACK === "true";
+}
+
 export async function POST(request: Request) {
   try {
     const { email } = (await request.json()) as { email?: string };
@@ -60,7 +64,22 @@ export async function POST(request: Request) {
 
     const code = createClientCode();
     await createLoginCode(client.id, client.email, code);
-    await sendCode(client.email, client.full_name, code);
+
+    try {
+      await sendCode(client.email, client.full_name, code);
+    } catch (emailError) {
+      if (!canShowDevCode()) {
+        throw emailError;
+      }
+
+      console.error("Erreur envoi code client Gmail en developpement:", emailError);
+      console.log(`CODE CLIENT DEV: ${code} (${client.email})`);
+
+      return NextResponse.json({
+        message:
+          "Code cree dans Supabase. En mode developpement, Gmail est bloque localement; consultez le terminal pour CODE CLIENT DEV.",
+      });
+    }
 
     return NextResponse.json({ message: "Un code d'acces vient d'etre envoye a votre courriel." });
   } catch (error) {
