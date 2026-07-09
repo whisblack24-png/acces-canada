@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { deleteClient, getClient, sanitizeClientInput, updateClient, validateClientInput } from "@/lib/admin-data";
+import {
+  adminErrorMessage,
+  deleteClient,
+  getClient,
+  logSupabaseError,
+  sanitizeClientInput,
+  updateClient,
+  validateClientInput,
+} from "@/lib/admin-data";
 
 export const runtime = "nodejs";
 
@@ -29,8 +37,8 @@ export async function GET(_request: Request, context: Context) {
     }
     return NextResponse.json({ client });
   } catch (error) {
-    console.error("Erreur lecture client:", error);
-    return NextResponse.json({ message: "Impossible de charger la fiche client." }, { status: 500 });
+    logSupabaseError("Erreur lecture client", error);
+    return NextResponse.json({ message: `Impossible de charger la fiche client. ${adminErrorMessage(error)}` }, { status: 500 });
   }
 }
 
@@ -48,8 +56,8 @@ export async function PATCH(request: Request, context: Context) {
   try {
     return NextResponse.json({ client: await updateClient(id, input) });
   } catch (error) {
-    console.error("Erreur modification client:", error);
-    return NextResponse.json({ message: "Impossible de modifier le client." }, { status: 500 });
+    logSupabaseError("Erreur modification client", error);
+    return NextResponse.json({ message: `Impossible de modifier le client. ${adminErrorMessage(error)}` }, { status: 500 });
   }
 }
 
@@ -63,7 +71,7 @@ export async function DELETE(_request: Request, context: Context) {
     await deleteClient(id);
     return NextResponse.json({ message: "Client supprimé." });
   } catch (error) {
-    console.error("Erreur suppression client:", error);
-    return NextResponse.json({ message: "Impossible de supprimer le client." }, { status: 500 });
+    logSupabaseError("Erreur suppression client", error);
+    return NextResponse.json({ message: `Impossible de supprimer le client. ${adminErrorMessage(error)}` }, { status: 500 });
   }
 }

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { createClient, listClients, sanitizeClientInput, validateClientInput } from "@/lib/admin-data";
+import {
+  adminErrorMessage,
+  createClient,
+  listClients,
+  logSupabaseError,
+  sanitizeClientInput,
+  validateClientInput,
+} from "@/lib/admin-data";
 
 export const runtime = "nodejs";
 
@@ -19,8 +26,8 @@ export async function GET() {
   try {
     return NextResponse.json({ clients: await listClients() });
   } catch (error) {
-    console.error("Erreur liste clients:", error);
-    return NextResponse.json({ message: "Impossible de charger les clients." }, { status: 500 });
+    logSupabaseError("Erreur liste clients", error);
+    return NextResponse.json({ message: `Impossible de charger les clients. ${adminErrorMessage(error)}` }, { status: 500 });
   }
 }
 
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json({ client: await createClient(input) }, { status: 201 });
   } catch (error) {
-    console.error("Erreur création client:", error);
-    return NextResponse.json({ message: "Impossible de créer le client." }, { status: 500 });
+    logSupabaseError("Erreur création client", error);
+    return NextResponse.json({ message: `Impossible de créer le client. ${adminErrorMessage(error)}` }, { status: 500 });
   }
 }

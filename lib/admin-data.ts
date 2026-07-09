@@ -29,6 +29,18 @@ export type ClientInput = {
 
 const statuses: ClientStatus[] = ["prospect", "active", "waiting", "approved", "closed"];
 
+export class SupabaseAdminError extends Error {
+  status: number;
+  details: string;
+
+  constructor(action: string, status: number, details: string) {
+    super(`${action} Supabase échouée (${status}) : ${details}`);
+    this.name = "SupabaseAdminError";
+    this.status = status;
+    this.details = details;
+  }
+}
+
 function supabaseConfig() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -48,6 +60,61 @@ function headers(key: string) {
     "Content-Type": "application/json",
   };
 }
+
+function clientPayload(input: ClientInput, mode: "full" | "compatible" = "full") {
+  const base = {
+    full_name: input.full_name,
+    email: input.email,
+    service: input.service,
+    status: input.status,
+  };
+
+  if (mode === "compatible") {
+    return base;
+  }
+
+  return {
+    ...base,
+    phone: input.phone || null,
+    country: input.country || null,
+    file_reference: input.file_reference || null,
+    notes: input.notes || null,
+    paid_amount: Number(input.paid_amount || 0),
+  };
+}
+
+async function supabaseError(action: string, response: Response) {
+  const details = await response.text();
+  return new SupabaseAdminError(action, response.status, details);
+}
+
+function looksLikeMissingColumn(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /column|schema cache|PGRST204|PGRST202|Could not find/i.test(message);
+}
+
+function logSupabaseError(action: string, error: unknown) {
+  if (error instanceof SupabaseAdminError) {
+    console.error(action, {
+      status: error.status,
+      details: error.details,
+      message: error.message,
+    });
+    return;
+  }
+
+  console.error(action, error);
+}
+
+export function adminErrorMessage(error: unknown) {
+  if (error instanceof SupabaseAdminError) {
+    return error.message;
+  }
+
+  return error instanceof Error ? error.message : "Erreur inconnue.";
+}
+
+export { logSupabaseError };
 
 export function sanitizeClientInput(input: Partial<ClientInput>): ClientInput {
   const status = statuses.includes(input.status as ClientStatus) ? (input.status as ClientStatus) : "prospect";
@@ -91,7 +158,7 @@ export async function listClients() {
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw await supabaseError("Liste clients", response);
   }
 
   return (await response.json()) as AdminClient[];
@@ -105,7 +172,7 @@ export async function getClient(id: string) {
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw await supabaseError("Lecture client", response);
   }
 
   const clients = (await response.json()) as AdminClient[];
@@ -114,32 +181,64 @@ export async function getClient(id: string) {
 
 export async function createClient(input: ClientInput) {
   const { url, key, table } = supabaseConfig();
-  const response = await fetch(`${url}/rest/v1/${table}`, {
-    method: "POST",
-    headers: { ...headers(key), Prefer: "return=representation" },
-    body: JSON.stringify(input),
-  });
 
-  if (!response.ok) {
-    throw new Error(await response.text());
+  async function insert(mode: "full" | "compatible") {
+    return fetch(`${url}/rest/v1/${table}`, {
+      method: "POST",
+      headers: { ...headers(key), Prefer: "return=representation" },
+      body: JSON.stringify(clientPayload(input, mode)),
+    });
   }
 
-  return ((await response.json()) as AdminClient[])[0];
+  const response = await insert("full");
+  if (response.ok) {
+    return ((await response.json()) as AdminClient[])[0];
+  }
+
+  const error = await supabaseError("Création client", response);
+  logSupabaseError("Erreur Supabase création client", error);
+
+  if (!looksLikeMissingColumn(error)) {
+    throw error;
+  }
+
+  const fallback = await insert("compatible");
+  if (!fallback.ok) {
+    throw await supabaseError("Création client compatible", fallback);
+  }
+
+  return ((await fallback.json()) as AdminClient[])[0];
 }
 
 export async function updateClient(id: string, input: ClientInput) {
   const { url, key, table } = supabaseConfig();
-  const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { ...headers(key), Prefer: "return=representation" },
-    body: JSON.stringify(input),
-  });
 
-  if (!response.ok) {
-    throw new Error(await response.text());
+  async function update(mode: "full" | "compatible") {
+    return fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { ...headers(key), Prefer: "return=representation" },
+      body: JSON.stringify(clientPayload(input, mode)),
+    });
   }
 
-  return ((await response.json()) as AdminClient[])[0];
+  const response = await update("full");
+  if (response.ok) {
+    return ((await response.json()) as AdminClient[])[0];
+  }
+
+  const error = await supabaseError("Modification client", response);
+  logSupabaseError("Erreur Supabase modification client", error);
+
+  if (!looksLikeMissingColumn(error)) {
+    throw error;
+  }
+
+  const fallback = await update("compatible");
+  if (!fallback.ok) {
+    throw await supabaseError("Modification client compatible", fallback);
+  }
+
+  return ((await fallback.json()) as AdminClient[])[0];
 }
 
 export async function deleteClient(id: string) {
@@ -150,7 +249,7 @@ export async function deleteClient(id: string) {
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw await supabaseError("Suppression client", response);
   }
 }
 
