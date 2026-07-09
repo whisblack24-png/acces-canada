@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, FileCheck2, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ClientDossierActions } from "@/components/admin/ClientDossierActions";
+import { ClientUploadedDocumentsAdmin } from "@/components/admin/ClientUploadedDocumentsAdmin";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
 import { listClientUploads } from "@/lib/client-portal";
@@ -121,25 +122,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
             </Panel>
 
             <Panel title="Documents envoyes par le client" icon={<FileCheck2 className="h-5 w-5" />}>
-              {uploadedDocuments.length ? (
-                <div className="space-y-2">
-                  {uploadedDocuments.map((document) => (
-                    <a
-                      key={document.id}
-                      href={`/api/admin/client-uploads/${document.id}/download?clientId=${client.id}`}
-                      className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74 transition hover:bg-gold/15"
-                    >
-                      <span>
-                        <span className="block">{document.file_name}</span>
-                        <span className="mt-1 block text-xs text-navy/42">{new Date(document.created_at).toLocaleDateString("fr-CA")}</span>
-                      </span>
-                      Telecharger
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document envoye par le client.</p>
-              )}
+              <ClientUploadedDocumentsAdmin clientId={client.id} documents={uploadedDocuments} />
             </Panel>
           </div>
         </section>

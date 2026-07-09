@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getClientSession } from "@/lib/client-auth";
-import { createClientUpload, listClientUploads, uploadClientFile } from "@/lib/client-portal";
+import { createClientUpload, listClientUploads, markClientUploadReceived, uploadClientFile } from "@/lib/client-portal";
 
 export const runtime = "nodejs";
 
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       file_type: file.type,
       file_size: file.size,
     });
+    await markClientUploadReceived(session.clientId, file.name);
 
     return NextResponse.json({ upload }, { status: 201 });
   } catch (error) {

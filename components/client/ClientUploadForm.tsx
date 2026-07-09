@@ -1,10 +1,12 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { UploadCloud } from "lucide-react";
 import type { ClientUploadedDocument } from "@/lib/client-portal";
 
 export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUploadedDocument[] }) {
+  const router = useRouter();
   const [uploads, setUploads] = useState(initialUploads);
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,7 @@ export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUpl
     setUploads([result.upload, ...uploads]);
     setFeedback("Document envoye avec succes.");
     form.reset();
+    router.refresh();
   }
 
   return (

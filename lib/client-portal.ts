@@ -103,6 +103,35 @@ export async function createClientUpload(record: Omit<ClientUploadedDocument, "i
   return ((await response.json()) as ClientUploadedDocument[])[0];
 }
 
+export async function markClientUploadReceived(clientId: string, fileName: string) {
+  const { url, key, clientsTable } = config();
+  const response = await fetch(`${url}/rest/v1/${clientsTable}?id=eq.${encodeURIComponent(clientId)}&select=*&limit=1`, {
+    headers: headers(key),
+    cache: "no-store",
+  });
+  if (!response.ok) await fail("Lecture dossier client", response);
+  const clients = (await response.json()) as AdminClient[];
+  const client = clients[0];
+  if (!client) return;
+
+  const received = Array.from(new Set([...(client.documents_received || []), fileName]));
+  const history = [
+    ...(client.action_history || []),
+    { date: new Date().toISOString(), action: `Document depose par le client : ${fileName}` },
+  ].slice(-100);
+
+  const patch = await fetch(`${url}/rest/v1/${clientsTable}?id=eq.${encodeURIComponent(clientId)}`, {
+    method: "PATCH",
+    headers: { ...headers(key), Prefer: "return=minimal" },
+    body: JSON.stringify({
+      documents_received: received,
+      action_history: history,
+      status: client.status === "nouveau" || client.status === "incomplet" ? "en_traitement" : client.status,
+    }),
+  });
+  if (!patch.ok) await fail("Mise a jour dossier apres depot", patch);
+}
+
 export async function uploadClientFile(clientId: string, file: File) {
   const { url, key, bucket } = config();
   const extension = file.name.split(".").pop()?.toLowerCase() || "file";
@@ -139,4 +168,32 @@ export async function downloadClientFile(clientId: string, uploadId: string) {
   });
   if (!fileResponse.ok) await fail("Telechargement fichier client", fileResponse);
   return { record, bytes: Buffer.from(await fileResponse.arrayBuffer()) };
+}
+
+export async function deleteClientFile(clientId: string, uploadId: string) {
+  const { url, key, uploadsTable, bucket } = config();
+  const metaResponse = await fetch(
+    `${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}&select=*&limit=1`,
+    { headers: headers(key), cache: "no-store" },
+  );
+  if (!metaResponse.ok) await fail("Lecture document client", metaResponse);
+  const records = (await metaResponse.json()) as ClientUploadedDocument[];
+  const record = records[0];
+  if (!record) return null;
+
+  const storageResponse = await fetch(`${url}/storage/v1/object/${bucket}/${record.file_path}`, {
+    method: "DELETE",
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  });
+  if (!storageResponse.ok && storageResponse.status !== 404) {
+    await fail("Suppression fichier client", storageResponse);
+  }
+
+  const deleteResponse = await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}`, {
+    method: "DELETE",
+    headers: headers(key),
+  });
+  if (!deleteResponse.ok) await fail("Suppression reference document client", deleteResponse);
+
+  return record;
 }
