@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, FileCheck2, FileText, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, Download, FileCheck2, FileText, Mail, MapPin, Phone } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ClientDossierActions } from "@/components/admin/ClientDossierActions";
 import { ClientUploadedDocumentsAdmin } from "@/components/admin/ClientUploadedDocumentsAdmin";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
+import { listGeneratedDocumentsForClient } from "@/lib/admin-documents";
 import { listClientUploads } from "@/lib/client-portal";
 import type { ServiceType } from "@/lib/admin-data";
 
@@ -37,7 +38,10 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
   const received = client.documents_received || [];
   const missing = client.documents_missing || [];
-  const uploadedDocuments = await listClientUploads(client.id).catch(() => []);
+  const [uploadedDocuments, generatedDocuments] = await Promise.all([
+    listClientUploads(client.id).catch(() => []),
+    listGeneratedDocumentsForClient(client.id).catch(() => []),
+  ]);
   const history = client.action_history?.length
     ? client.action_history
     : [{ date: client.created_at, action: "Dossier client cree dans le CRM." }];
@@ -123,6 +127,30 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
             <Panel title="Documents envoyes par le client" icon={<FileCheck2 className="h-5 w-5" />}>
               <ClientUploadedDocumentsAdmin clientId={client.id} documents={uploadedDocuments} />
+            </Panel>
+
+            <Panel title="Documents generes par Acces Canada" icon={<FileText className="h-5 w-5" />}>
+              {generatedDocuments.length ? (
+                <div className="space-y-3">
+                  {generatedDocuments.map((document) => (
+                    <a
+                      key={document.id}
+                      href={`/api/admin/documents/${document.id}/download`}
+                      className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/72 transition hover:bg-gold/15"
+                    >
+                      <span>
+                        <span className="block font-black text-navy">{document.document_label}</span>
+                        <span className="mt-1 block text-xs text-navy/42">
+                          {new Date(document.created_at).toLocaleDateString("fr-CA")}
+                        </span>
+                      </span>
+                      <Download className="h-4 w-4" />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document genere pour ce client.</p>
+              )}
             </Panel>
           </div>
         </section>

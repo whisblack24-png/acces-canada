@@ -31,11 +31,13 @@ const optionLabels: { key: keyof DocumentGenerationOptions; label: string }[] = 
 export function DocumentsManager({
   clients,
   initialDocuments,
+  initialClientId,
 }: {
   clients: AdminClient[];
   initialDocuments: GeneratedDocument[];
+  initialClientId?: string;
 }) {
-  const [clientId, setClientId] = useState(clients[0]?.id || "");
+  const [clientId, setClientId] = useState(initialClientId || clients[0]?.id || "");
   const [documentType, setDocumentType] = useState<ClientDocumentType>("convention");
   const [options, setOptions] = useState<DocumentGenerationOptions>(defaultOptions);
   const [documents, setDocuments] = useState(initialDocuments);
@@ -44,6 +46,10 @@ export function DocumentsManager({
 
   const selectedClient = useMemo(() => clients.find((client) => client.id === clientId) || null, [clients, clientId]);
   const selectedDocument = documentLibrary.find((document) => document.type === documentType);
+  const filteredDocuments = useMemo(
+    () => (clientId ? documents.filter((document) => document.client_id === clientId) : documents),
+    [clientId, documents],
+  );
 
   async function refreshHistory() {
     const response = await fetch("/api/admin/documents", { credentials: "include" });
@@ -97,8 +103,8 @@ export function DocumentsManager({
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Generation</p>
-        <h2 className="mt-2 font-display text-3xl font-black text-navy">Nouveau document</h2>
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Generation automatique</p>
+        <h2 className="mt-2 font-display text-3xl font-black text-navy">Generer un document</h2>
 
         <form onSubmit={generate} className="mt-6 space-y-5">
           <label className="block text-sm font-bold text-navy/70">
@@ -177,7 +183,7 @@ export function DocumentsManager({
             <h2 className="mt-2 font-display text-3xl font-black text-navy">Documents generes</h2>
           </div>
           <span className="w-fit rounded-full bg-gold/20 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-navy">
-            {documents.length} document{documents.length > 1 ? "s" : ""}
+            {filteredDocuments.length} document{filteredDocuments.length > 1 ? "s" : ""}
           </span>
         </div>
 
@@ -189,8 +195,8 @@ export function DocumentsManager({
             <span className="text-right">Actions</span>
           </div>
 
-          {documents.length ? (
-            documents.map((document) => (
+          {filteredDocuments.length ? (
+            filteredDocuments.map((document) => (
               <div
                 key={document.id}
                 className="grid grid-cols-1 gap-3 border-t border-navy/10 px-4 py-4 md:grid-cols-[1fr_0.9fr_0.7fr_0.45fr] md:items-center"
@@ -225,7 +231,7 @@ export function DocumentsManager({
               </div>
             ))
           ) : (
-            <p className="px-4 py-8 text-center text-sm font-bold text-navy/50">Aucun document genere pour le moment.</p>
+            <p className="px-4 py-8 text-center text-sm font-bold text-navy/50">Aucun document genere pour ce client.</p>
           )}
         </div>
       </section>

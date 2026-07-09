@@ -24,7 +24,7 @@ export type DocumentGenerationOptions = {
 export const documentLabels: Record<ClientDocumentType, string> = {
   convention: "Convention de services",
   "reconnaissance-dette": "Reconnaissance de dette",
-  "checklist-visa": "Liste de verification visa",
+  "checklist-visa": "Liste de verification visa visiteur",
   facture: "Facture client",
   "lettre-explicative": "Lettre explicative",
   "lettre-soutien-financier": "Lettre de soutien financier",
@@ -34,17 +34,17 @@ export const documentLabels: Record<ClientDocumentType, string> = {
 
 export const documentLibrary: { type: ClientDocumentType; label: string; description: string }[] = [
   { type: "convention", label: documentLabels.convention, description: "Cadre professionnel de prestation et responsabilites." },
-  { type: "reconnaissance-dette", label: documentLabels["reconnaissance-dette"], description: "Modalites de paiement et engagement financier." },
-  { type: "checklist-visa", label: documentLabels["checklist-visa"], description: "Documents recus, manquants et suivi du dossier." },
   { type: "facture", label: documentLabels.facture, description: "Facturation client avec montant, taxes et statut." },
-  { type: "lettre-explicative", label: documentLabels["lettre-explicative"], description: "Lettre narrative pour clarifier le projet du demandeur." },
+  { type: "recu-paiement", label: documentLabels["recu-paiement"], description: "Preuve de paiement professionnelle pour le client." },
+  { type: "reconnaissance-dette", label: documentLabels["reconnaissance-dette"], description: "Modalites de paiement et engagement financier." },
+  { type: "checklist-visa", label: documentLabels["checklist-visa"], description: "Documents recus, manquants et suivi du dossier visa visiteur." },
+  { type: "lettre-explicative", label: documentLabels["lettre-explicative"], description: "Lettre explicative IRCC simple pour clarifier le projet du demandeur." },
   {
     type: "lettre-soutien-financier",
     label: documentLabels["lettre-soutien-financier"],
     description: "Modele de soutien financier adapte au dossier client.",
   },
   { type: "lettre-invitation", label: documentLabels["lettre-invitation"], description: "Lettre d'invitation pour visite temporaire au Canada." },
-  { type: "recu-paiement", label: documentLabels["recu-paiement"], description: "Preuve de paiement professionnelle pour le client." },
 ];
 
 function safe(value: string | number | null | undefined) {
@@ -270,8 +270,13 @@ export function generateClientPdf(client: AdminClient, type: ClientDocumentType,
 
   content.push("q 0.043 0.114 0.212 rg 0 720 612 72 re f Q\n");
   content.push("q 0.831 0.686 0.216 rg 36 706 540 3 re f Q\n");
-  content.push("BT /F2 21 Tf 1 1 1 rg 36 756 Td (ACCES CANADA) Tj ET\n");
-  content.push("BT /F1 9 Tf 1 1 1 rg 36 738 Td (Votre chemin vers le Canada, notre engagement.) Tj ET\n");
+  content.push("q 0.831 0.686 0.216 rg 36 734 46 46 re f Q\n");
+  content.push("q 0.8 0.063 0.18 rg 42 740 34 34 re f Q\n");
+  content.push("BT /F2 16 Tf 1 1 1 rg 48 752 Td (AC) Tj ET\n");
+  content.push("BT /F2 21 Tf 1 1 1 rg 96 756 Td (ACCES CANADA) Tj ET\n");
+  content.push("BT /F1 9 Tf 1 1 1 rg 96 738 Td (Votre chemin vers le Canada, notre engagement.) Tj ET\n");
+  content.push("BT /F1 8 Tf 1 1 1 rg 390 756 Td (+1 819-266-8420) Tj ET\n");
+  content.push("BT /F1 8 Tf 1 1 1 rg 390 742 Td (accesc625@gmail.com) Tj ET\n");
   content.push(`BT /F2 18 Tf 0.043 0.114 0.212 rg 36 682 Td (${safe(title)}) Tj ET\n`);
   content.push(`BT /F1 10 Tf 0.2 0.2 0.2 rg 36 664 Td (Genere le ${safe(dateFr(new Date().toISOString()))}) Tj ET\n`);
   y = 628;

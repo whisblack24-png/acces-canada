@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, Edit3, Trash2 } from "lucide-react";
-
-const documents = [
-  { label: "Convention de services", type: "convention" },
-  { label: "Reconnaissance de dette", type: "reconnaissance-dette" },
-  { label: "Liste de verification visa", type: "checklist-visa" },
-  { label: "Facture client", type: "facture" },
-];
+import { Edit3, FilePlus2, Trash2 } from "lucide-react";
 
 export function ClientDossierActions({ clientId, clientName }: { clientId: string; clientName: string }) {
   const router = useRouter();
@@ -53,19 +46,17 @@ export function ClientDossierActions({ clientId, clientName }: { clientId: strin
       </div>
 
       <div className="rounded-[1.5rem] border border-gold/25 bg-gold/10 p-4">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-navy/52">Generer PDF</p>
-        <div className="mt-3 grid gap-2">
-          {documents.map((document) => (
-            <a
-              key={document.type}
-              href={`/api/admin/clients/${clientId}/documents/${document.type}`}
-              className="inline-flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 text-sm font-black text-navy shadow-sm transition hover:bg-navy hover:text-white"
-            >
-              {document.label}
-              <Download className="h-4 w-4" />
-            </a>
-          ))}
-        </div>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-navy/52">Documents automatiques</p>
+        <p className="mt-2 text-sm font-bold leading-6 text-navy/66">
+          Creez une convention, facture, recu, reconnaissance de dette, checklist ou lettre explicative a partir de ce dossier.
+        </p>
+        <Link
+          href={`/admin/documents/generation?clientId=${clientId}`}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-black text-navy transition hover:bg-navy hover:text-white"
+        >
+          <FilePlus2 className="h-4 w-4" />
+          Generer document
+        </Link>
       </div>
     </div>
   );
