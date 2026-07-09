@@ -37,7 +37,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
           <nav className="mt-8 space-y-2">
             {adminNav.map((item) => {
-              const active = pathname === item.href;
+              const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(`${item.href}/`));
               return item.disabled ? (
                 <div key={item.href} className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-white/28">
                   <item.icon className="h-5 w-5" />

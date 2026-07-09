@@ -1,28 +1,37 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Edit3, Eye, Plus, Trash2, X } from "lucide-react";
-import type { AdminClient, ClientInput, ClientStatus } from "@/lib/admin-data";
+import { FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
+import { Edit3, Eye, FileText, Plus, Trash2, X } from "lucide-react";
+import { dossierStatuses, serviceLabels, serviceTypes, statusLabels } from "@/lib/admin-data";
+import type { AdminClient, ClientInput, ClientStatus, ServiceType } from "@/lib/admin-data";
 
 const emptyForm: ClientInput = {
   full_name: "",
   email: "",
   phone: "",
   country: "",
-  service: "Consultation immigration",
-  status: "prospect",
+  service: "visa_visiteur",
+  status: "nouveau",
   file_reference: "",
   notes: "",
+  internal_notes: "",
+  documents_received: [],
+  documents_missing: [],
+  action_history: [],
   paid_amount: 0,
 };
 
-const statusLabels: Record<ClientStatus, string> = {
-  prospect: "Prospect",
-  active: "Dossier actif",
-  waiting: "En attente",
-  approved: "Approuvé",
-  closed: "Clôturé",
-};
+function linesToArray(value: string) {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function arrayToLines(value: string[] | null | undefined) {
+  return (value || []).join("\n");
+}
 
 export function ClientsManager({ initialClients }: { initialClients: AdminClient[] }) {
   const [clients, setClients] = useState(initialClients);
@@ -32,14 +41,10 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    setClients(initialClients);
-  }, [initialClients]);
-
   const stats = useMemo(
     () => ({
       total: clients.length,
-      active: clients.filter((client) => ["active", "waiting"].includes(client.status)).length,
+      active: clients.filter((client) => ["en_attente", "incomplet", "en_traitement"].includes(client.status)).length,
       revenue: clients.reduce((sum, client) => sum + Number(client.paid_amount || 0), 0),
     }),
     [clients],
@@ -57,6 +62,10 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
       status: client.status,
       file_reference: client.file_reference || "",
       notes: client.notes || "",
+      internal_notes: client.internal_notes || client.notes || "",
+      documents_received: client.documents_received || [],
+      documents_missing: client.documents_missing || [],
+      action_history: client.action_history || [],
       paid_amount: Number(client.paid_amount || 0),
     });
   }
@@ -127,7 +136,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
         </div>
 
         <div className="mt-6 overflow-hidden rounded-2xl border border-navy/10">
-          <div className="grid grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] bg-navy px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white/70">
+          <div className="grid grid-cols-[1.1fr_0.9fr_0.8fr_0.8fr] bg-navy px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white/70">
             <span>Client</span>
             <span>Service</span>
             <span>Statut</span>
@@ -137,18 +146,26 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
             clients.map((client) => (
               <div
                 key={client.id}
-                className="grid grid-cols-1 gap-3 border-t border-navy/10 px-4 py-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_0.8fr] md:items-center"
+                className="grid grid-cols-1 gap-3 border-t border-navy/10 px-4 py-4 md:grid-cols-[1.1fr_0.9fr_0.8fr_0.8fr] md:items-center"
               >
                 <button type="button" onClick={() => setSelected(client)} className="text-left">
                   <span className="block font-black text-navy">{client.full_name}</span>
                   <span className="mt-1 block text-sm text-navy/52">{client.email}</span>
                 </button>
-                <span className="text-sm font-bold text-navy/64">{client.service}</span>
+                <span className="text-sm font-bold text-navy/64">{serviceLabels[client.service as ServiceType] || client.service}</span>
                 <span className="w-fit rounded-full bg-gold/18 px-3 py-1 text-xs font-black text-navy">
-                  {statusLabels[client.status]}
+                  {statusLabels[client.status] || client.status}
                 </span>
                 <span className="flex justify-start gap-2 md:justify-end">
-                  <IconButton label="Voir" onClick={() => setSelected(client)} icon={<Eye className="h-4 w-4" />} />
+                  <Link
+                    href={`/admin/clients/${client.id}`}
+                    aria-label="Ouvrir le dossier"
+                    title="Ouvrir le dossier"
+                    className="grid h-9 w-9 place-items-center rounded-full bg-gold/20 text-navy transition hover:bg-gold"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Link>
+                  <IconButton label="Aperçu" onClick={() => setSelected(client)} icon={<Eye className="h-4 w-4" />} />
                   <IconButton label="Modifier" onClick={() => edit(client)} icon={<Edit3 className="h-4 w-4" />} />
                   <IconButton label="Supprimer" onClick={() => remove(client)} icon={<Trash2 className="h-4 w-4" />} danger />
                 </span>
@@ -176,7 +193,22 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
             <Input label="E-mail" type="email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} required />
             <Input label="Téléphone" value={form.phone || ""} onChange={(value) => setForm({ ...form, phone: value })} />
             <Input label="Pays" value={form.country || ""} onChange={(value) => setForm({ ...form, country: value })} />
-            <Input label="Service" value={form.service} onChange={(value) => setForm({ ...form, service: value })} required />
+
+            <label className="block text-sm font-bold text-navy/70">
+              Type de service
+              <select
+                value={form.service}
+                onChange={(event) => setForm({ ...form, service: event.target.value })}
+                className="mt-2 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
+              >
+                {serviceTypes.map((value) => (
+                  <option key={value} value={value}>
+                    {serviceLabels[value]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <label className="block text-sm font-bold text-navy/70">
               Statut du dossier
               <select
@@ -184,13 +216,14 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
                 onChange={(event) => setForm({ ...form, status: event.target.value as ClientStatus })}
                 className="mt-2 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
               >
-                {Object.entries(statusLabels).map(([value, label]) => (
+                {dossierStatuses.map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {statusLabels[value]}
                   </option>
                 ))}
               </select>
             </label>
+
             <Input label="Référence dossier" value={form.file_reference || ""} onChange={(value) => setForm({ ...form, file_reference: value })} />
             <Input
               label="Montant payé"
@@ -198,14 +231,24 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
               value={String(form.paid_amount || 0)}
               onChange={(value) => setForm({ ...form, paid_amount: Number(value) })}
             />
-            <label className="block text-sm font-bold text-navy/70">
-              Notes
-              <textarea
-                value={form.notes || ""}
-                onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                className="mt-2 min-h-28 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
-              />
-            </label>
+
+            <Textarea
+              label="Notes internes"
+              value={form.internal_notes || ""}
+              onChange={(value) => setForm({ ...form, internal_notes: value, notes: value })}
+            />
+            <Textarea
+              label="Documents reçus"
+              value={arrayToLines(form.documents_received)}
+              onChange={(value) => setForm({ ...form, documents_received: linesToArray(value) })}
+              placeholder="Passeport&#10;Photo d'identité&#10;Relevés bancaires"
+            />
+            <Textarea
+              label="Documents manquants"
+              value={arrayToLines(form.documents_missing)}
+              onChange={(value) => setForm({ ...form, documents_missing: linesToArray(value) })}
+              placeholder="Lettre d'invitation&#10;Preuve d'emploi"
+            />
 
             {feedback ? <p className="rounded-2xl bg-gold/15 px-4 py-3 text-sm font-bold text-navy">{feedback}</p> : null}
 
@@ -228,14 +271,23 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
               <Detail label="E-mail" value={selected.email} />
               <Detail label="Téléphone" value={selected.phone || "Non renseigné"} />
               <Detail label="Pays" value={selected.country || "Non renseigné"} />
-              <Detail label="Service" value={selected.service} />
-              <Detail label="Statut" value={statusLabels[selected.status]} />
+              <Detail label="Service" value={serviceLabels[selected.service as ServiceType] || selected.service} />
+              <Detail label="Statut" value={statusLabels[selected.status] || selected.status} />
               <Detail label="Référence" value={selected.file_reference || "À créer"} />
               <Detail label="Paiements" value={`${Number(selected.paid_amount || 0).toLocaleString("fr-CA")} $`} />
               <div className="rounded-2xl bg-white/8 p-4">
                 <span className="block text-xs font-black uppercase tracking-[0.16em] text-white/42">Notes</span>
-                <p className="mt-2 text-sm leading-6 text-white/72">{selected.notes || "Aucune note pour ce client."}</p>
+                <p className="mt-2 text-sm leading-6 text-white/72">
+                  {selected.internal_notes || selected.notes || "Aucune note pour ce client."}
+                </p>
               </div>
+              <Link
+                href={`/admin/clients/${selected.id}`}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-black text-navy transition hover:bg-white"
+              >
+                <FileText className="h-4 w-4" />
+                Ouvrir le dossier complet
+              </Link>
             </div>
           ) : (
             <p className="mt-4 text-sm text-white/60">Sélectionnez un client pour consulter sa fiche complète.</p>
@@ -277,6 +329,30 @@ function Input({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-2 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
+      />
+    </label>
+  );
+}
+
+function Textarea({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block text-sm font-bold text-navy/70">
+      {label}
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 min-h-24 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
+        placeholder={placeholder}
       />
     </label>
   );

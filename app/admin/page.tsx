@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { CalendarDays, CreditCard, DollarSign, FolderKanban, UsersRound } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { listClients, dashboardStats } from "@/lib/admin-data";
+import { listClients, dashboardStats, serviceLabels, statusLabels } from "@/lib/admin-data";
+import type { ServiceType } from "@/lib/admin-data";
 
 export const metadata: Metadata = {
   title: "Administration",
@@ -57,9 +58,11 @@ export default async function AdminDashboardPage() {
               <div key={client.id} className="flex items-center justify-between rounded-2xl bg-ivory p-4">
                 <span>
                   <span className="block font-black text-navy">{client.full_name}</span>
-                  <span className="mt-1 block text-sm text-navy/52">{client.service}</span>
+                  <span className="mt-1 block text-sm text-navy/52">{serviceLabels[client.service as ServiceType] || client.service}</span>
                 </span>
-                <span className="rounded-full bg-gold/20 px-3 py-1 text-xs font-black text-navy">{client.status}</span>
+                <span className="rounded-full bg-gold/20 px-3 py-1 text-xs font-black text-navy">
+                  {statusLabels[client.status] || client.status}
+                </span>
               </div>
             ))}
             {!clients.length ? <p className="text-sm font-bold text-navy/50">Aucun client enregistré pour le moment.</p> : null}

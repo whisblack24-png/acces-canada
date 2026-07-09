@@ -54,6 +54,11 @@ export async function PATCH(request: Request, context: Context) {
   }
 
   try {
+    const existing = await getClient(id);
+    input.action_history = [
+      ...(existing?.action_history || []),
+      { date: new Date().toISOString(), action: "Dossier client modifié dans le CRM." },
+    ].slice(-100);
     return NextResponse.json({ client: await updateClient(id, input) });
   } catch (error) {
     logSupabaseError("Erreur modification client", error);

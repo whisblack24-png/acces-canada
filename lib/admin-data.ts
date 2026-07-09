@@ -1,4 +1,10 @@
-export type ClientStatus = "prospect" | "active" | "waiting" | "approved" | "closed";
+export type ClientStatus = "nouveau" | "en_attente" | "incomplet" | "en_traitement" | "termine" | "refuse";
+export type ServiceType = "visa_visiteur" | "permis_etudes" | "permis_travail" | "residence_permanente" | "autre";
+
+export type ActionHistoryItem = {
+  date: string;
+  action: string;
+};
 
 export type AdminClient = {
   id: string;
@@ -12,6 +18,10 @@ export type AdminClient = {
   status: ClientStatus;
   file_reference: string | null;
   notes: string | null;
+  internal_notes: string | null;
+  documents_received: string[] | null;
+  documents_missing: string[] | null;
+  action_history: ActionHistoryItem[] | null;
   paid_amount: number;
 };
 
@@ -24,10 +34,40 @@ export type ClientInput = {
   status: ClientStatus;
   file_reference?: string;
   notes?: string;
+  internal_notes?: string;
+  documents_received?: string[];
+  documents_missing?: string[];
+  action_history?: ActionHistoryItem[];
   paid_amount?: number;
 };
 
-const statuses: ClientStatus[] = ["prospect", "active", "waiting", "approved", "closed"];
+export const dossierStatuses: ClientStatus[] = ["nouveau", "en_attente", "incomplet", "en_traitement", "termine", "refuse"];
+export const serviceTypes: ServiceType[] = ["visa_visiteur", "permis_etudes", "permis_travail", "residence_permanente", "autre"];
+
+const legacyStatusMap: Record<string, ClientStatus> = {
+  prospect: "nouveau",
+  active: "en_traitement",
+  waiting: "en_attente",
+  approved: "termine",
+  closed: "termine",
+};
+
+export const statusLabels: Record<ClientStatus, string> = {
+  nouveau: "Nouveau",
+  en_attente: "En attente",
+  incomplet: "Incomplet",
+  en_traitement: "En traitement",
+  termine: "Terminé",
+  refuse: "Refusé",
+};
+
+export const serviceLabels: Record<ServiceType, string> = {
+  visa_visiteur: "Visa visiteur",
+  permis_etudes: "Permis d'études",
+  permis_travail: "Permis de travail",
+  residence_permanente: "Résidence permanente",
+  autre: "Autre",
+};
 
 export class SupabaseAdminError extends Error {
   status: number;
@@ -79,6 +119,12 @@ function clientPayload(input: ClientInput, mode: "full" | "compatible" = "full")
     country: input.country || null,
     file_reference: input.file_reference || null,
     notes: input.notes || null,
+    internal_notes: input.internal_notes || null,
+    documents_received: input.documents_received || [],
+    documents_missing: input.documents_missing || [],
+    action_history: input.action_history?.length ? input.action_history : [
+      { date: new Date().toISOString(), action: "Fiche client mise à jour dans le CRM." },
+    ],
     paid_amount: Number(input.paid_amount || 0),
   };
 }
@@ -117,17 +163,35 @@ export function adminErrorMessage(error: unknown) {
 export { logSupabaseError };
 
 export function sanitizeClientInput(input: Partial<ClientInput>): ClientInput {
-  const status = statuses.includes(input.status as ClientStatus) ? (input.status as ClientStatus) : "prospect";
+  const rawStatus = String(input.status || "");
+  const status = dossierStatuses.includes(rawStatus as ClientStatus)
+    ? (rawStatus as ClientStatus)
+    : legacyStatusMap[rawStatus] || "nouveau";
+  const rawService = String(input.service || "").trim();
+  const service = serviceTypes.includes(rawService as ServiceType) ? rawService : rawService || "autre";
 
   return {
     full_name: String(input.full_name || "").trim().slice(0, 180),
     email: String(input.email || "").trim().toLowerCase().slice(0, 254),
     phone: String(input.phone || "").trim().slice(0, 80) || undefined,
     country: String(input.country || "").trim().slice(0, 120) || undefined,
-    service: String(input.service || "").trim().slice(0, 160),
+    service: service.slice(0, 160),
     status,
     file_reference: String(input.file_reference || "").trim().slice(0, 120) || undefined,
     notes: String(input.notes || "").trim().slice(0, 3000) || undefined,
+    internal_notes: String(input.internal_notes || "").trim().slice(0, 3000) || undefined,
+    documents_received: Array.isArray(input.documents_received)
+      ? input.documents_received.map((item) => String(item).trim()).filter(Boolean).slice(0, 60)
+      : [],
+    documents_missing: Array.isArray(input.documents_missing)
+      ? input.documents_missing.map((item) => String(item).trim()).filter(Boolean).slice(0, 60)
+      : [],
+    action_history: Array.isArray(input.action_history)
+      ? input.action_history
+          .map((item) => ({ date: String(item.date || new Date().toISOString()), action: String(item.action || "").trim() }))
+          .filter((item) => item.action)
+          .slice(0, 100)
+      : [],
     paid_amount: Number(input.paid_amount || 0),
   };
 }
@@ -254,7 +318,7 @@ export async function deleteClient(id: string) {
 }
 
 export function dashboardStats(clients: AdminClient[]) {
-  const active = clients.filter((client) => ["active", "waiting"].includes(client.status)).length;
+  const active = clients.filter((client) => ["en_attente", "incomplet", "en_traitement"].includes(client.status)).length;
   const payments = clients.filter((client) => Number(client.paid_amount) > 0).length;
   const revenue = clients.reduce((total, client) => total + Number(client.paid_amount || 0), 0);
 
