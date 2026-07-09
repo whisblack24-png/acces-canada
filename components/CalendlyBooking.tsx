@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Script from "next/script";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, CreditCard } from "lucide-react";
 
 const calendlyUrl =
   "https://calendly.com/accesc625/30min?locale=fr&hide_gdpr_banner=1&primary_color=d4af37&text_color=0b1d36";
@@ -32,6 +32,22 @@ export function CalendlyBooking() {
         <p className="mt-2 text-sm leading-6 text-navy/58">
           Sélectionnez une date, une heure, puis confirmez vos informations directement dans le calendrier.
         </p>
+      </div>
+
+      <div className="mx-5 mt-5 flex items-start gap-4 rounded-2xl border border-gold/35 bg-[#FBF7EA] px-5 py-4 text-navy shadow-[0_18px_45px_rgba(11,29,54,0.08)] md:mx-7">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gold text-navy">
+          <CreditCard className="h-5 w-5" />
+        </span>
+        <span>
+          <span className="block text-sm font-black uppercase tracking-[0.18em] text-canada">
+            Paiement de la consultation
+          </span>
+          <span className="mt-2 block text-sm leading-6 text-navy/72">
+            Selon le type de consultation choisi, un paiement sécurisé peut être demandé au moment de la réservation via
+            Stripe. Le paiement est entièrement sécurisé et votre rendez-vous sera confirmé une fois la réservation
+            complétée.
+          </span>
+        </span>
       </div>
 
       {scheduled ? (
