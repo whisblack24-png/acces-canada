@@ -25,7 +25,6 @@ type ContactRecord = {
   preferred_date: string | null;
   message: string;
   status: "new";
-  source: "website";
 };
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -178,7 +177,6 @@ export async function POST(request: Request) {
       preferred_date: payload.preferredDate || null,
       message: payload.message,
       status: "new",
-      source: "website",
     });
 
     await sendEmails(payload, submittedAt);

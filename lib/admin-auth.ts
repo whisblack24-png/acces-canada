@@ -19,6 +19,10 @@ function safeEqual(a: string, b: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
+function useSecureCookie() {
+  return process.env.VERCEL === "1" || process.env.VERCEL === "true";
+}
+
 export function verifyAdminPassword(password: string) {
   const expected = process.env.ADMIN_PASSWORD;
   if (!expected) {
@@ -57,8 +61,8 @@ export async function setAdminSession() {
   store.set(ADMIN_COOKIE, createAdminSessionValue(), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    secure: useSecureCookie(),
+    path: "/",
     maxAge: maxAgeSeconds,
   });
 }
@@ -68,8 +72,8 @@ export async function clearAdminSession() {
   store.set(ADMIN_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/admin",
+    secure: useSecureCookie(),
+    path: "/",
     maxAge: 0,
   });
 }
