@@ -4,6 +4,7 @@ import { listClients } from "@/lib/admin-data";
 import { buildAdminReport, generateAdminReportPdf } from "@/lib/admin-reports";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) {

@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   title: "Rapports",
 };
 
+export const dynamic = "force-dynamic";
+
 function money(value: number) {
   return `${Number(value || 0).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
 }
