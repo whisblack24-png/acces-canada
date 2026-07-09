@@ -30,7 +30,9 @@ export default async function ClientDocumentsPage() {
         <section>
           <p className="text-sm font-black uppercase tracking-[0.24em] text-canada">Documents</p>
           <h1 className="mt-3 font-display text-4xl font-black text-navy md:text-6xl">Depots et telechargements</h1>
-          <p className="mt-4 max-w-3xl leading-8 text-navy/62">Envoyez vos pieces justificatives et telechargez les documents prepares par Acces Canada.</p>
+          <p className="mt-4 max-w-3xl leading-8 text-navy/62">
+            Espace de {client.full_name}. Envoyez vos pieces justificatives et telechargez les documents prepares par Acces Canada.
+          </p>
         </section>
 
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
