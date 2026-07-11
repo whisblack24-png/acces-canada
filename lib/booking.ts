@@ -475,22 +475,36 @@ export function generateAppointmentInvoicePdf(appointment: Appointment) {
 }
 
 export async function sendAppointmentConfirmationEmail(appointment: Appointment) {
-  const host = process.env.SMTP_HOST;
+  const host = process.env.SMTP_HOST?.trim();
   const port = Number(process.env.SMTP_PORT || 465);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || user;
-  if (!host || !user || !pass || !from) return;
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS?.trim();
+  const from = process.env.SMTP_FROM?.trim() || user;
+  const missing = [
+    ["SMTP_HOST", host],
+    ["SMTP_USER", user],
+    ["SMTP_PASS", pass],
+    ["SMTP_FROM", from],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missing.length) {
+    throw new Error(`Configuration SMTP incomplète: ${missing.join(", ")}.`);
+  }
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+    throw new Error("Configuration SMTP invalide: SMTP_PORT doit être un port valide.");
+  }
 
   const invoice = generateAppointmentInvoicePdf(appointment);
   await sendSmtpMail({
-    host,
+    host: host!,
     port,
     secure: String(process.env.SMTP_SECURE || "true") === "true",
     startTls: String(process.env.SMTP_STARTTLS || "false") === "true",
-    user,
-    pass,
-    from,
+    user: user!,
+    pass: pass!,
+    from: from!,
     to: appointment.client_email,
     subject: `Accès Canada - rendez-vous confirmé ${appointment.booking_reference}`,
     text: `Bonjour ${appointment.client_full_name},

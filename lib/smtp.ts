@@ -20,6 +20,16 @@ type SmtpOptions = {
   }[];
 };
 
+const SMTP_TIMEOUT_MS = 15_000;
+
+function attachTimeout<T extends net.Socket>(socket: T): T {
+  socket.setTimeout(SMTP_TIMEOUT_MS);
+  socket.on("timeout", () => {
+    socket.destroy(new Error(`Délai SMTP dépassé après ${SMTP_TIMEOUT_MS / 1000} secondes.`));
+  });
+  return socket;
+}
+
 function waitForLine(socket: net.Socket): Promise<string> {
   return new Promise((resolve, reject) => {
     let buffer = "";
@@ -70,21 +80,21 @@ async function command(socket: net.Socket, line: string, expected: number[]) {
 
 function connectPlain(host: string, port: number): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
-    const socket = net.connect(port, host, () => resolve(socket));
+    const socket = attachTimeout(net.connect(port, host, () => resolve(socket)));
     socket.once("error", reject);
   });
 }
 
 function connectTls(host: string, port: number): Promise<tls.TLSSocket> {
   return new Promise((resolve, reject) => {
-    const socket = tls.connect({ host, port, servername: host }, () => resolve(socket));
+    const socket = attachTimeout(tls.connect({ host, port, servername: host }, () => resolve(socket)));
     socket.once("error", reject);
   });
 }
 
 function upgradeToTls(socket: net.Socket, host: string): Promise<tls.TLSSocket> {
   return new Promise((resolve, reject) => {
-    const secureSocket = tls.connect({ socket, servername: host }, () => resolve(secureSocket));
+    const secureSocket = attachTimeout(tls.connect({ socket, servername: host }, () => resolve(secureSocket)));
     secureSocket.once("error", reject);
   });
 }
