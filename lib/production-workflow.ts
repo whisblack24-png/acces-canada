@@ -49,7 +49,7 @@ function config() {
     paymentsTable: process.env.SUPABASE_CLIENT_PAYMENTS_TABLE || "client_payments",
     stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
-    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
+    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || "https://acces-canada.vercel.app").replace(/\/$/, ""),
   };
 }
 

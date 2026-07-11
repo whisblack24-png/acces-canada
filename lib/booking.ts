@@ -39,7 +39,7 @@ function config() {
     key,
     table: process.env.SUPABASE_APPOINTMENTS_TABLE || "client_appointments",
     stripeSecretKey: process.env.STRIPE_SECRET_KEY || "",
-    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
+    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || "https://acces-canada.vercel.app").replace(/\/$/, ""),
   };
 }
 
@@ -307,11 +307,15 @@ export async function createAppointmentCheckout(input: AppointmentInput) {
 
 export async function confirmAppointmentFromStripeSession(session: {
   id?: string;
+  payment_status?: string | null;
   payment_intent?: string | null;
   payment_method_types?: string[];
   metadata?: Record<string, string | undefined> | null;
 }) {
   if (!session.id || session.metadata?.workflow !== "appointment_booking") return null;
+  if (session.payment_status !== "paid") {
+    throw new Error(`La session Stripe ${session.id} n'est pas payée.`);
+  }
 
   const { url, key, table } = config();
   const existingResponse = await fetch(`${url}/rest/v1/${table}?stripe_session_id=eq.${encodeURIComponent(session.id)}&select=*&limit=1`, {
@@ -320,7 +324,10 @@ export async function confirmAppointmentFromStripeSession(session: {
   });
   if (!existingResponse.ok) await supabaseError("Lecture du rendez-vous Stripe", existingResponse);
   const existing = ((await existingResponse.json()) as Appointment[])[0];
-  if (existing) return existing;
+  if (existing) {
+    await sendAppointmentConfirmationEmail(existing);
+    return existing;
+  }
 
   const metadata = session.metadata || {};
   const normalized = normalizeAppointmentInput({
@@ -377,7 +384,7 @@ export async function confirmAppointmentFromStripeSession(session: {
   });
   if (!insertResponse.ok) await supabaseError("Confirmation du rendez-vous", insertResponse);
   const appointment = ((await insertResponse.json()) as Appointment[])[0];
-  await sendAppointmentConfirmationEmail(appointment).catch((error) => console.error("Courriel de rendez-vous non envoyé:", error));
+  await sendAppointmentConfirmationEmail(appointment);
   return appointment;
 }
 

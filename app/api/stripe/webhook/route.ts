@@ -18,6 +18,7 @@ export async function POST(request: Request) {
       data?: {
         object?: {
           id?: string;
+          payment_status?: string | null;
           payment_intent?: string | null;
           payment_method_types?: string[];
           metadata?: Record<string, string | undefined> | null;
