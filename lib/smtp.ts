@@ -1,4 +1,4 @@
-import net from "node:net";
+﻿import net from "node:net";
 import tls from "node:tls";
 
 type SmtpOptions = {
@@ -13,6 +13,11 @@ type SmtpOptions = {
   subject: string;
   text: string;
   replyTo?: string;
+  attachments?: {
+    filename: string;
+    contentType: string;
+    content: Buffer;
+  }[];
 };
 
 function waitForLine(socket: net.Socket): Promise<string> {
@@ -88,18 +93,54 @@ function encodeAddress(address: string) {
   return address.replace(/[\r\n<>]/g, "").trim();
 }
 
+function encodeHeader(value: string) {
+  return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
 function formatMessage(options: SmtpOptions) {
   const from = encodeAddress(options.from);
   const to = encodeAddress(options.to);
   const replyTo = options.replyTo ? encodeAddress(options.replyTo) : undefined;
   const subject = options.subject.replace(/[\r\n]/g, " ").trim();
   const escapedText = options.text.replace(/^\./gm, "..");
+  const attachments = options.attachments || [];
+
+  if (attachments.length) {
+    const boundary = `acces-canada-${Date.now().toString(36)}`;
+    const parts = [
+      `From: Accès Canada <${from}>`,
+      `To: ${to}`,
+      replyTo ? `Reply-To: ${replyTo}` : "",
+      `Subject: ${encodeHeader(subject)}`,
+      "MIME-Version: 1.0",
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      escapedText,
+      "",
+      ...attachments.flatMap((attachment) => [
+        `--${boundary}`,
+        `Content-Type: ${attachment.contentType}; name="${encodeHeader(attachment.filename)}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Disposition: attachment; filename="${encodeHeader(attachment.filename)}"`,
+        "",
+        attachment.content.toString("base64").replace(/(.{76})/g, "$1\r\n"),
+        "",
+      ]),
+      `--${boundary}--`,
+    ];
+
+    return parts.filter(Boolean).join("\r\n");
+  }
 
   return [
     `From: Accès Canada <${from}>`,
     `To: ${to}`,
     replyTo ? `Reply-To: ${replyTo}` : "",
-    `Subject: ${subject}`,
+    `Subject: ${encodeHeader(subject)}`,
     "MIME-Version: 1.0",
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: 8bit",

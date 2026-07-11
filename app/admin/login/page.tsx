@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/admin/LoginForm";

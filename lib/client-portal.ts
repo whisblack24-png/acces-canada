@@ -1,4 +1,4 @@
-import type { AdminClient } from "@/lib/admin-data";
+﻿import type { AdminClient } from "@/lib/admin-data";
 import { hashClientCode } from "@/lib/client-auth";
 
 export type ClientUploadedDocument = {
@@ -52,11 +52,11 @@ function encodeStoragePath(path: string) {
 
 async function fail(action: string, response: Response) {
   const details = await response.text();
-  console.error(`[Supabase portail client] ${action} echouee`, {
+  console.error(`[Supabase portail client] ${action} échouée`, {
     status: response.status,
     details,
   });
-  throw new Error(`${action} Supabase echouee (${response.status}) : ${details}`);
+  throw new Error(`${action} Supabase échouée (${response.status}) : ${details}`);
 }
 
 async function ensureClientDocumentsBucket() {
@@ -84,7 +84,7 @@ async function ensureClientDocumentsBucket() {
   }
 
   if (readResponse.status !== 404) {
-    await fail("Verification bucket documents client", readResponse);
+    await fail("Vérification du bucket documents client", readResponse);
   }
 
   const createResponse = await fetch(`${url}/storage/v1/bucket`, {
@@ -98,7 +98,7 @@ async function ensureClientDocumentsBucket() {
   });
 
   if (!createResponse.ok && createResponse.status !== 409) {
-    await fail("Creation bucket documents client", createResponse);
+    await fail("Création du bucket documents client", createResponse);
   }
 
   if (createResponse.status === 409) {
@@ -135,7 +135,7 @@ export async function createLoginCode(clientId: string, email: string, code: str
       used_at: null,
     }),
   });
-  if (!response.ok) await fail("Creation code client", response);
+  if (!response.ok) await fail("Création du code client", response);
 }
 
 export async function verifyLoginCode(email: string, code: string) {
@@ -145,7 +145,7 @@ export async function verifyLoginCode(email: string, code: string) {
     `${url}/rest/v1/${codesTable}?email=eq.${encodeURIComponent(email.toLowerCase())}&code_hash=eq.${codeHash}&used_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=*&order=created_at.desc&limit=1`,
     { headers: headers(key), cache: "no-store" },
   );
-  if (!response.ok) await fail("Verification code client", response);
+  if (!response.ok) await fail("Vérification du code client", response);
   const rows = (await response.json()) as { id: string; client_id: string; email: string }[];
   const row = rows[0];
   if (!row) return null;
@@ -186,7 +186,7 @@ export async function createClientUpload(record: Omit<ClientUploadedDocument, "i
     headers: { ...headers(key), Prefer: "return=representation" },
     body: JSON.stringify(record),
   });
-  if (!response.ok) await fail("Creation document client", response);
+  if (!response.ok) await fail("Création document client", response);
   return ((await response.json()) as ClientUploadedDocument[])[0];
 }
 
@@ -204,7 +204,7 @@ export async function markClientUploadReceived(clientId: string, fileName: strin
   const received = Array.from(new Set([...(client.documents_received || []), fileName]));
   const history = [
     ...(client.action_history || []),
-    { date: new Date().toISOString(), action: `Document depose par le client : ${fileName}` },
+    { date: new Date().toISOString(), action: `Document déposé par le client : ${fileName}` },
   ].slice(-100);
 
   const patch = await fetch(`${url}/rest/v1/${clientsTable}?id=eq.${encodeURIComponent(clientId)}`, {
@@ -213,10 +213,10 @@ export async function markClientUploadReceived(clientId: string, fileName: strin
     body: JSON.stringify({
       documents_received: received,
       action_history: history,
-      status: client.status === "nouveau" || client.status === "incomplet" ? "en_traitement" : client.status,
+      status: client.status === "nouveau" || client.status === "documents_en_attente" || client.status === "en_attente" ? "documents_recus" : client.status,
     }),
   });
-  if (!patch.ok) await fail("Mise a jour dossier apres depot", patch);
+  if (!patch.ok) await fail("Mise à jour du dossier après dépôt", patch);
 }
 
 export async function uploadClientFile(clientId: string, file: File) {
@@ -235,7 +235,7 @@ export async function uploadClientFile(clientId: string, file: File) {
     },
     body: Buffer.from(await file.arrayBuffer()),
   });
-  if (!response.ok) await fail("Depot fichier client", response);
+  if (!response.ok) await fail("Dépôt du fichier client", response);
   return path;
 }
 
@@ -254,7 +254,7 @@ export async function downloadClientFile(clientId: string, uploadId: string) {
     headers: supabaseAuthHeaders(key),
     cache: "no-store",
   });
-  if (!fileResponse.ok) await fail("Telechargement fichier client", fileResponse);
+  if (!fileResponse.ok) await fail("Téléchargement du fichier client", fileResponse);
   return { record, bytes: Buffer.from(await fileResponse.arrayBuffer()) };
 }
 
@@ -281,7 +281,7 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
     method: "DELETE",
     headers: headers(key),
   });
-  if (!deleteResponse.ok) await fail("Suppression reference document client", deleteResponse);
+  if (!deleteResponse.ok) await fail("Suppression de la référence du document client", deleteResponse);
 
   return record;
 }

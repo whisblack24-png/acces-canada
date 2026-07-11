@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { getClient } from "@/lib/admin-data";
+import { getClient, updateClient } from "@/lib/admin-data";
 import {
   adminDocumentErrorMessage,
   createGeneratedDocument,
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 
 async function requireAdmin() {
   if (!(await isAdminAuthenticated())) {
-    return NextResponse.json({ message: "Non autorise." }, { status: 401 });
+    return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
   }
 
   return null;
@@ -60,9 +60,29 @@ export async function POST(request: Request) {
       included_information: body.included_information || {},
     });
 
+    await updateClient(client.id, {
+      full_name: client.full_name,
+      email: client.email,
+      phone: client.phone || undefined,
+      country: client.country || undefined,
+      service: client.service,
+      status: client.status,
+      file_reference: client.file_reference || undefined,
+      notes: client.notes || undefined,
+      public_notes: client.public_notes || undefined,
+      internal_notes: client.internal_notes || undefined,
+      documents_received: client.documents_received || [],
+      documents_missing: client.documents_missing || [],
+      paid_amount: Number(client.paid_amount || 0),
+      action_history: [
+        ...(client.action_history || []),
+        { date: new Date().toISOString(), action: `Document généré: ${document.document_label}.` },
+      ].slice(-100),
+    }).catch((error) => console.error("Historique du document non mis à jour:", error));
+
     return NextResponse.json({ document }, { status: 201 });
   } catch (error) {
     logDocumentError("Erreur creation document", error);
-    return NextResponse.json({ message: `Impossible de generer le document. ${adminDocumentErrorMessage(error)}` }, { status: 500 });
+    return NextResponse.json({ message: `Impossible de générer le document. ${adminDocumentErrorMessage(error)}` }, { status: 500 });
   }
 }

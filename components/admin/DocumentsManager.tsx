@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useMemo, useState } from "react";
 import { Download, FilePlus2, Trash2 } from "lucide-react";
@@ -7,6 +7,7 @@ import { serviceLabels } from "@/lib/admin-data";
 import type { GeneratedDocument } from "@/lib/admin-documents";
 import { documentLibrary } from "@/lib/pdf-documents";
 import type { ClientDocumentType, DocumentGenerationOptions } from "@/lib/pdf-documents";
+import { formatDateFr } from "@/lib/format";
 
 const defaultOptions: DocumentGenerationOptions = {
   includePersonalInfo: true,
@@ -20,9 +21,9 @@ const defaultOptions: DocumentGenerationOptions = {
 
 const optionLabels: { key: keyof DocumentGenerationOptions; label: string }[] = [
   { key: "includePersonalInfo", label: "Informations personnelles" },
-  { key: "includeContactInfo", label: "Coordonnees" },
+  { key: "includeContactInfo", label: "Coordonnées" },
   { key: "includeServiceInfo", label: "Service et statut" },
-  { key: "includeDocuments", label: "Documents recus / manquants" },
+  { key: "includeDocuments", label: "Documents reçus / manquants" },
   { key: "includeNotes", label: "Notes internes" },
   { key: "includePayments", label: "Paiements" },
   { key: "includeSignatures", label: "Signatures" },
@@ -60,7 +61,7 @@ export function DocumentsManager({
   async function generate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!clientId) {
-      setFeedback("Selectionnez un client avant de generer un document.");
+      setFeedback("Sélectionnez un client avant de générer un document.");
       return;
     }
 
@@ -77,11 +78,11 @@ export function DocumentsManager({
     setLoading(false);
 
     if (!response.ok || !result.document) {
-      setFeedback(result.message || "Impossible de generer le document.");
+      setFeedback(result.message || "Impossible de générer le document.");
       return;
     }
 
-    setFeedback("Document genere avec succes.");
+    setFeedback("Document généré avec succès.");
     window.open(`/api/admin/documents/${result.document.id}/download`, "_blank", "noopener,noreferrer");
     await refreshHistory();
   }
@@ -96,15 +97,15 @@ export function DocumentsManager({
       return;
     }
 
-    setFeedback("Document supprime de l'historique.");
+    setFeedback("Document supprimé de l'historique.");
     await refreshHistory();
   }
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Generation automatique</p>
-        <h2 className="mt-2 font-display text-3xl font-black text-navy">Generer un document</h2>
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Génération automatique</p>
+        <h2 className="mt-2 font-display text-3xl font-black text-navy">Générer un document</h2>
 
         <form onSubmit={generate} className="mt-6 space-y-5">
           <label className="block text-sm font-bold text-navy/70">
@@ -139,7 +140,7 @@ export function DocumentsManager({
           </label>
 
           <div className="rounded-[1.5rem] bg-navy p-5 text-white">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-gold">Informations a inclure</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-gold">Informations à inclure</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {optionLabels.map((option) => (
                 <label key={option.key} className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold">
@@ -171,7 +172,7 @@ export function DocumentsManager({
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-canada px-5 py-3 text-sm font-black text-white transition hover:bg-navy disabled:bg-navy/35"
           >
             <FilePlus2 className="h-4 w-4" />
-            {loading ? "Generation..." : "Generer le document"}
+            {loading ? "Génération..." : "Générer le document"}
           </button>
         </form>
       </section>
@@ -180,7 +181,7 @@ export function DocumentsManager({
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Historique</p>
-            <h2 className="mt-2 font-display text-3xl font-black text-navy">Documents generes</h2>
+            <h2 className="mt-2 font-display text-3xl font-black text-navy">Documents générés</h2>
           </div>
           <span className="w-fit rounded-full bg-gold/20 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-navy">
             {filteredDocuments.length} document{filteredDocuments.length > 1 ? "s" : ""}
@@ -207,13 +208,13 @@ export function DocumentsManager({
                 </span>
                 <span className="text-sm font-bold text-navy/68">{document.document_label}</span>
                 <span className="text-sm font-bold text-navy/52">
-                  {new Date(document.created_at).toLocaleDateString("fr-CA")}
+                  {formatDateFr(document.created_at)}
                 </span>
                 <span className="flex justify-start gap-2 md:justify-end">
                   <a
                     href={`/api/admin/documents/${document.id}/download`}
-                    aria-label="Telecharger"
-                    title="Telecharger"
+                    aria-label="Télécharger"
+                    title="Télécharger"
                     className="grid h-9 w-9 place-items-center rounded-full bg-gold/20 text-navy transition hover:bg-gold"
                   >
                     <Download className="h-4 w-4" />
@@ -231,7 +232,7 @@ export function DocumentsManager({
               </div>
             ))
           ) : (
-            <p className="px-4 py-8 text-center text-sm font-bold text-navy/50">Aucun document genere pour ce client.</p>
+            <p className="px-4 py-8 text-center text-sm font-bold text-navy/50">Aucun document généré pour ce client.</p>
           )}
         </div>
       </section>

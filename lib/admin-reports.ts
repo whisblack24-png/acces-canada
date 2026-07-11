@@ -1,8 +1,9 @@
-import type { AdminClient, ClientStatus, ServiceType } from "@/lib/admin-data";
+﻿import type { AdminClient, ClientStatus, ServiceType } from "@/lib/admin-data";
 import { dashboardStats, dossierStatuses, serviceLabels, serviceTypes, statusLabels } from "@/lib/admin-data";
 import { listGeneratedDocuments, type GeneratedDocument } from "@/lib/admin-documents";
 import { listAllClientUploads, type ClientUploadedDocument } from "@/lib/client-portal";
 import { brand } from "@/lib/site";
+import { formatDateFr, formatMoney } from "@/lib/format";
 
 export type ReportRow = {
   label: string;
@@ -19,6 +20,7 @@ export type AdminReport = {
     activeCases: number;
     completedCases: number;
     refusedCases: number;
+    pendingPayments: number;
     generatedDocuments: number;
     uploadedDocuments: number;
     payments: number;
@@ -43,18 +45,17 @@ function countBy<T extends string>(items: T[]) {
 function monthLabel(dateValue: string) {
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return "Date inconnue";
-  return date.toLocaleDateString("fr-CA", { month: "short", year: "numeric" });
+  return date.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
 }
 
 function money(value: number) {
-  return `${Number(value || 0).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+  return formatMoney(value);
 }
 
 function safePdf(value: string | number | null | undefined) {
   return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\x20-\x7E]/g, "")
+    .normalize("NFC")
+    .replace(/[^\x20-\x7E\u00A0-\u00FF]/g, " ")
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
@@ -94,8 +95,9 @@ export async function buildAdminReport(clients: AdminClient[]): Promise<AdminRep
     totals: {
       clients: stats.clients,
       activeCases: stats.active,
-      completedCases: clients.filter((client) => client.status === "termine").length,
-      refusedCases: clients.filter((client) => client.status === "refuse").length,
+      completedCases: stats.completed,
+      refusedCases: stats.refused,
+      pendingPayments: stats.pendingPayments,
       generatedDocuments: generatedDocuments.length,
       uploadedDocuments: uploadedDocuments.length,
       payments: stats.payments,
@@ -118,7 +120,7 @@ export async function buildAdminReport(clients: AdminClient[]): Promise<AdminRep
 
 export function generateAdminReportPdf(report: AdminReport) {
   const content: string[] = [];
-  const generatedDate = new Date(report.generatedAt).toLocaleDateString("fr-CA");
+  const generatedDate = formatDateFr(report.generatedAt);
   let y = 760;
 
   content.push("q 0.043 0.114 0.212 rg 0 720 612 72 re f Q\n");
@@ -126,16 +128,18 @@ export function generateAdminReportPdf(report: AdminReport) {
   line(content, brand.name.toUpperCase(), 36, 756, 21, true, "1 1 1");
   line(content, brand.slogan, 36, 738, 9, false, "1 1 1");
   line(content, "Rapport administratif", 36, 682, 22, true);
-  line(content, `Genere le ${generatedDate}`, 36, 662, 10, false, "0.2 0.2 0.2");
+  line(content, `Généré le ${generatedDate}`, 36, 662, 10, false, "0.2 0.2 0.2");
   y = 625;
 
-  section(content, "Synthese", y);
+  section(content, "Synthèse", y);
   y -= 30;
   const cards = [
     ["Clients", report.totals.clients],
     ["Dossiers actifs", report.totals.activeCases],
-    ["Documents generes", report.totals.generatedDocuments],
-    ["Documents envoyes", report.totals.uploadedDocuments],
+    ["Dossiers terminés", report.totals.completedCases],
+    ["Paiements en attente", report.totals.pendingPayments],
+    ["Documents générés", report.totals.generatedDocuments],
+    ["Documents envoyés", report.totals.uploadedDocuments],
     ["Paiements", report.totals.payments],
     ["Revenus", money(report.totals.revenue)],
   ];
@@ -147,7 +151,7 @@ export function generateAdminReportPdf(report: AdminReport) {
   });
 
   y -= 62;
-  section(content, "Repartition des dossiers", y);
+  section(content, "Répartition des dossiers", y);
   y -= 28;
   report.byStatus.forEach((row) => {
     line(content, row.label, 48, y, 9, false, "0.12 0.12 0.12");
@@ -156,7 +160,7 @@ export function generateAdminReportPdf(report: AdminReport) {
   });
 
   y -= 12;
-  section(content, "Services demandes", y);
+  section(content, "Services demandés", y);
   y -= 28;
   report.byService.forEach((row) => {
     line(content, row.label, 48, y, 9, false, "0.12 0.12 0.12");
@@ -167,23 +171,26 @@ export function generateAdminReportPdf(report: AdminReport) {
   y -= 12;
   section(content, "Documents", y);
   y -= 28;
-  const documentRows = report.documentsByType.length ? report.documentsByType : [{ label: "Aucun document genere", value: 0 }];
+  const documentRows = report.documentsByType.length ? report.documentsByType : [{ label: "Aucun document généré", value: 0 }];
   documentRows.slice(0, 8).forEach((row) => {
     line(content, row.label, 48, y, 9, false, "0.12 0.12 0.12");
     line(content, String(row.value), 340, y, 9, true);
     y -= 18;
   });
 
-  y -= 10;
-  section(content, "Dossiers recents", y);
-  y -= 28;
-  report.recentClients.slice(0, 7).forEach((client) => {
-    const service = serviceLabels[client.service as ServiceType] || client.service;
-    const status = statusLabels[client.status as ClientStatus] || client.status;
-    line(content, `${client.full_name} - ${service}`, 48, y, 8.5, false, "0.12 0.12 0.12");
-    line(content, status, 430, y, 8.5, true);
-    y -= 16;
-  });
+  if (y > 145) {
+    y -= 10;
+    section(content, "Dossiers récents", y);
+    y -= 28;
+    report.recentClients.slice(0, 4).forEach((client) => {
+      if (y < 64) return;
+      const service = serviceLabels[client.service as ServiceType] || client.service;
+      const status = statusLabels[client.status as ClientStatus] || client.status;
+      line(content, `${client.full_name} - ${service}`, 48, y, 8.5, false, "0.12 0.12 0.12");
+      line(content, status, 430, y, 8.5, true);
+      y -= 16;
+    });
+  }
 
   content.push("q 0.8 0.063 0.18 rg 36 45 540 1 re f Q\n");
   line(content, `${brand.phone}  |  ${brand.email}`, 36, 30, 8, false, "0.3 0.3 0.3");
@@ -199,8 +206,8 @@ export function generateAdminReportPdf(report: AdminReport) {
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
     offsets,
   );
-  writeObject(parts, 4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", offsets);
-  writeObject(parts, 5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>", offsets);
+  writeObject(parts, 4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>", offsets);
+  writeObject(parts, 5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>", offsets);
   writeObject(parts, 6, `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`, offsets);
 
   const xref = parts.join("").length;
@@ -211,4 +218,78 @@ export function generateAdminReportPdf(report: AdminReport) {
   parts.push(`trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
 
   return Buffer.from(parts.join(""), "latin1");
+}
+
+function xml(value: string | number | null | undefined) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function worksheet(name: string, rows: (string | number)[][]) {
+  return `<Worksheet ss:Name="${xml(name)}"><Table>${rows
+    .map(
+      (row) =>
+        `<Row>${row
+          .map((cell) => {
+            const type = typeof cell === "number" ? "Number" : "String";
+            return `<Cell><Data ss:Type="${type}">${xml(cell)}</Data></Cell>`;
+          })
+          .join("")}</Row>`,
+    )
+    .join("")}</Table></Worksheet>`;
+}
+
+export function generateAdminReportExcel(report: AdminReport) {
+  const clientsRows: (string | number)[][] = [
+    ["Référence", "Client", "Courriel", "Téléphone", "Pays", "Service", "Statut", "Montant payé", "Création"],
+    ...report.clients.map((client) => [
+      client.file_reference || "",
+      client.full_name,
+      client.email,
+      client.phone || "",
+      client.country || "",
+      serviceLabels[client.service as ServiceType] || client.service,
+      statusLabels[client.status as ClientStatus] || client.status,
+      Number(client.paid_amount || 0),
+      formatDateFr(client.created_at),
+    ]),
+  ];
+  const casesRows: (string | number)[][] = [
+    ["Statut", "Nombre"],
+    ...report.byStatus.map((row) => [row.label, row.value]),
+  ];
+  const paymentsRows: (string | number)[][] = [
+    ["Indicateur", "Valeur"],
+    ["Paiements enregistrés", report.totals.payments],
+    ["Paiements en attente", report.totals.pendingPayments],
+    ["Revenus", report.totals.revenue],
+  ];
+  const performanceRows: (string | number)[][] = [
+    ["Indicateur", "Valeur"],
+    ["Clients", report.totals.clients],
+    ["Dossiers actifs", report.totals.activeCases],
+    ["Dossiers terminés", report.totals.completedCases],
+    ["Dossiers refusés", report.totals.refusedCases],
+    ["Documents générés", report.totals.generatedDocuments],
+    ["Documents envoyés", report.totals.uploadedDocuments],
+    ["Documents reçus", report.totals.documentsReceived],
+    ["Documents manquants", report.totals.documentsMissing],
+  ];
+
+  const xmlWorkbook = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+${worksheet("Clients", clientsRows)}
+${worksheet("Dossiers", casesRows)}
+${worksheet("Paiements", paymentsRows)}
+${worksheet("Performances", performanceRows)}
+</Workbook>`;
+
+  return Buffer.from(xmlWorkbook, "utf8");
 }

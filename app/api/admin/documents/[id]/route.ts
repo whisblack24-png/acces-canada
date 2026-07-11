@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { adminDocumentErrorMessage, deleteGeneratedDocument, logDocumentError } from "@/lib/admin-documents";
 
@@ -10,7 +10,7 @@ type Context = {
 
 export async function DELETE(_request: Request, context: Context) {
   if (!(await isAdminAuthenticated())) {
-    return NextResponse.json({ message: "Non autorise." }, { status: 401 });
+    return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
   }
 
   const { id } = await context.params;

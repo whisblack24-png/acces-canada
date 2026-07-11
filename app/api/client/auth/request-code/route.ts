@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClientCode } from "@/lib/client-auth";
 import { createLoginCode, findClientByEmail } from "@/lib/client-portal";
 import { sendSmtpMail } from "@/lib/smtp";
@@ -29,17 +29,17 @@ async function sendCode(email: string, name: string, code: string) {
     from: smtpFrom,
     to: email,
     replyTo: brand.email,
-    subject: "Acces Canada - code d'acces client",
+    subject: "Accès Canada - code d'accès client",
     text: [
       `Bonjour ${name},`,
       "",
-      "Voici votre code temporaire pour acceder a votre espace client Acces Canada :",
+      "Voici votre code temporaire pour accéder à votre espace client Accès Canada :",
       "",
       code,
       "",
       "Ce code expire dans 10 minutes.",
       "",
-      "Acces Canada",
+      "Accès Canada",
       "Votre chemin vers le Canada, notre engagement.",
     ].join("\n"),
   });
@@ -72,12 +72,12 @@ export async function POST(request: Request) {
         throw emailError;
       }
 
-      console.error("Erreur envoi code client Gmail en developpement:", emailError);
+      console.error("Erreur envoi code client Gmail en développement:", emailError);
       console.log(`CODE CLIENT DEV: ${code} (${client.email})`);
 
       return NextResponse.json({
         message:
-          "Code cree dans Supabase. En mode developpement, Gmail est bloque localement; consultez le terminal pour CODE CLIENT DEV.",
+          "Code créé dans Supabase. En mode développement, Gmail est bloqué localement; consultez le terminal pour CODE CLIENT DEV.",
       });
     }
 
@@ -91,11 +91,11 @@ export async function POST(request: Request) {
 
     if (/SMTP|AUTH|535|534|Username|Password|credentials|authentication/i.test(message)) {
       return NextResponse.json(
-        { message: "Impossible d'envoyer le code : Gmail/SMTP a refuse la connexion. Verifiez SMTP_USER et SMTP_PASS." },
+        { message: "Impossible d'envoyer le code : Gmail/SMTP a refusé la connexion. Vérifiez SMTP_USER et SMTP_PASS." },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ message: "Impossible d'envoyer le code pour le moment. Verifiez la configuration Gmail SMTP." }, { status: 500 });
+    return NextResponse.json({ message: "Impossible d'envoyer le code pour le moment. Vérifiez la configuration Gmail SMTP." }, { status: 500 });
   }
 }

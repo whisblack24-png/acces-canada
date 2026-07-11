@@ -1,4 +1,4 @@
-import { MessageCircle } from "lucide-react";
+﻿import { MessageCircle } from "lucide-react";
 import { brand } from "@/lib/site";
 
 export function WhatsAppButton() {

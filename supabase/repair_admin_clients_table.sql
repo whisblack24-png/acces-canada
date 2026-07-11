@@ -1,4 +1,4 @@
--- Correctif ciblé pour la table CRM admin_clients.
+﻿-- Correctif ciblé pour la table CRM admin_clients.
 -- À exécuter dans Supabase > SQL Editor si l'ajout client échoue.
 
 create extension if not exists pgcrypto;

@@ -1,4 +1,4 @@
-import type { ClientDocumentType, DocumentGenerationOptions } from "@/lib/pdf-documents";
+﻿import type { ClientDocumentType, DocumentGenerationOptions } from "@/lib/pdf-documents";
 import { documentLabels } from "@/lib/pdf-documents";
 
 export type GeneratedDocument = {
@@ -25,7 +25,7 @@ export class SupabaseDocumentError extends Error {
   details: string;
 
   constructor(action: string, status: number, details: string) {
-    super(`${action} Supabase echouee (${status}) : ${details}`);
+    super(`${action} Supabase échouée (${status}) : ${details}`);
     this.name = "SupabaseDocumentError";
     this.status = status;
     this.details = details;
@@ -138,7 +138,7 @@ export async function createGeneratedDocument(input: GeneratedDocumentInput) {
   });
 
   if (!response.ok) {
-    throw await supabaseError("Creation document", response);
+    throw await supabaseError("Création document", response);
   }
 
   return ((await response.json()) as GeneratedDocument[])[0];

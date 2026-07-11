@@ -1,5 +1,6 @@
-import type { AdminClient, ServiceType } from "@/lib/admin-data";
+﻿import type { AdminClient, ServiceType } from "@/lib/admin-data";
 import { serviceLabels, statusLabels } from "@/lib/admin-data";
+import { formatDateFr, formatMoney } from "@/lib/format";
 
 export type ClientDocumentType =
   | "convention"
@@ -24,46 +25,44 @@ export type DocumentGenerationOptions = {
 export const documentLabels: Record<ClientDocumentType, string> = {
   convention: "Convention de services",
   "reconnaissance-dette": "Reconnaissance de dette",
-  "checklist-visa": "Liste de verification visa visiteur",
+  "checklist-visa": "Liste de vérification visa visiteur",
   facture: "Facture client",
   "lettre-explicative": "Lettre explicative",
   "lettre-soutien-financier": "Lettre de soutien financier",
   "lettre-invitation": "Lettre d'invitation",
-  "recu-paiement": "Recu de paiement",
+  "recu-paiement": "Reçu de paiement",
 };
 
 export const documentLibrary: { type: ClientDocumentType; label: string; description: string }[] = [
-  { type: "convention", label: documentLabels.convention, description: "Cadre professionnel de prestation et responsabilites." },
+  { type: "convention", label: documentLabels.convention, description: "Cadre professionnel de prestation et responsabilités." },
   { type: "facture", label: documentLabels.facture, description: "Facturation client avec montant, taxes et statut." },
   { type: "recu-paiement", label: documentLabels["recu-paiement"], description: "Preuve de paiement professionnelle pour le client." },
-  { type: "reconnaissance-dette", label: documentLabels["reconnaissance-dette"], description: "Modalites de paiement et engagement financier." },
-  { type: "checklist-visa", label: documentLabels["checklist-visa"], description: "Documents recus, manquants et suivi du dossier visa visiteur." },
+  { type: "reconnaissance-dette", label: documentLabels["reconnaissance-dette"], description: "Modalités de paiement et engagement financier." },
+  { type: "checklist-visa", label: documentLabels["checklist-visa"], description: "Documents reçus, manquants et suivi du dossier visa visiteur." },
   { type: "lettre-explicative", label: documentLabels["lettre-explicative"], description: "Lettre explicative IRCC simple pour clarifier le projet du demandeur." },
   {
     type: "lettre-soutien-financier",
     label: documentLabels["lettre-soutien-financier"],
-    description: "Modele de soutien financier adapte au dossier client.",
+    description: "Modèle de soutien financier adapté au dossier client.",
   },
   { type: "lettre-invitation", label: documentLabels["lettre-invitation"], description: "Lettre d'invitation pour visite temporaire au Canada." },
 ];
 
 function safe(value: string | number | null | undefined) {
   return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\x20-\x7E]/g, "")
+    .normalize("NFC")
+    .replace(/[^\x20-\x7E\u00A0-\u00FF]/g, " ")
     .replace(/\\/g, "\\\\")
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)");
 }
 
 function dateFr(value?: string | null) {
-  if (!value) return new Date().toLocaleDateString("fr-CA");
-  return new Date(value).toLocaleDateString("fr-CA");
+  return formatDateFr(value || new Date());
 }
 
 function money(value: number | null | undefined) {
-  return `${Number(value || 0).toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+  return formatMoney(value);
 }
 
 function baseInfo(client: AdminClient, options: DocumentGenerationOptions = {}) {
@@ -76,18 +75,22 @@ function baseInfo(client: AdminClient, options: DocumentGenerationOptions = {}) 
   const rows: [string, string][] = [];
 
   if (include.includePersonalInfo) {
-    rows.push(["Client", client.full_name], ["Pays", client.country || "Non renseigne"]);
+    rows.push(
+      ["Nom complet du client", client.full_name],
+      ["Référence dossier", client.file_reference || "Référence à créer"],
+      ["Pays", client.country || "Non renseigné"],
+    );
   }
 
   if (include.includeContactInfo) {
-    rows.push(["Courriel", client.email], ["Telephone", client.phone || "Non renseigne"]);
+    rows.push(["Courriel", client.email], ["Téléphone", client.phone || "Non renseigné"]);
   }
 
   if (include.includeServiceInfo) {
     rows.push(
       ["Service", serviceLabels[client.service as ServiceType] || client.service],
       ["Statut", statusLabels[client.status] || client.status],
-      ["Reference dossier", client.file_reference || "A creer"],
+      ["Date de création", dateFr(client.created_at)],
     );
   }
 
@@ -96,7 +99,7 @@ function baseInfo(client: AdminClient, options: DocumentGenerationOptions = {}) 
 
 function notesRows(client: AdminClient, options: DocumentGenerationOptions) {
   return options.includeNotes
-    ? ([["section", "Notes internes"], ["Texte", client.internal_notes || client.notes || "Aucune note particuliere."]] as [string, string][])
+    ? ([["section", "Notes internes"], ["Texte", client.internal_notes || client.notes || "Aucune note particulière."]] as [string, string][])
     : [];
 }
 
@@ -106,7 +109,8 @@ function signatureRows(options: DocumentGenerationOptions) {
     : ([
         ["section", "Signatures"],
         ["Client", "Signature: ____________________________   Date: ____________"],
-        ["Acces Canada", "Signature: ____________________________   Date: ____________"],
+        ["Accès Canada", "Christian Nkuli Mboyo, Directeur général - Accès Canada"],
+        ["Signature", "Signature: ____________________________   Date: ____________"],
       ] as [string, string][]);
 }
 
@@ -122,8 +126,8 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
     ...options,
   };
   const issued = dateFr(new Date().toISOString());
-  const received = client.documents_received?.length ? client.documents_received : ["Aucun document marque comme recu"];
-  const missing = client.documents_missing?.length ? client.documents_missing : ["Aucun document marque comme manquant"];
+  const received = client.documents_received?.length ? client.documents_received : ["Aucun document marqué comme reçu"];
+  const missing = client.documents_missing?.length ? client.documents_missing : ["Aucun document marqué comme manquant"];
 
   if (type === "convention") {
     return [
@@ -132,11 +136,11 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
       ["section", "Objet de la convention"],
       [
         "Texte",
-        "Acces Canada accompagne le client dans la preparation administrative de son dossier. Les decisions finales relevent exclusivement des autorites canadiennes.",
+        "Accès Canada accompagne le client dans la préparation administrative de son dossier. Les décisions finales relèvent exclusivement des autorités canadiennes.",
       ],
       ["section", "Engagements"],
-      ["Texte", "Le client s'engage a fournir des renseignements exacts, complets et verifiables."],
-      ["Texte", "Acces Canada assure un suivi professionnel, confidentiel et conforme aux informations communiquees."],
+      ["Texte", "Le client s'engage à fournir des renseignements exacts, complets et vérifiables."],
+      ["Texte", "Accès Canada assure un suivi professionnel, confidentiel et conforme aux informations communiquées."],
       ...notesRows(client, settings),
       ...signatureRows(settings),
     ];
@@ -146,10 +150,10 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
     return [
       ["section", "Informations du client"],
       ...baseInfo(client, settings),
-      ...(settings.includePayments ? ([["Montant deja paye", money(client.paid_amount)]] as [string, string][]) : []),
-      ["section", "Modalites de paiement"],
-      ["Texte", "Le client reconnait devoir les montants restant dus selon les conditions convenues avec Acces Canada."],
-      ["Texte", "Tout retard de paiement peut suspendre le traitement administratif du dossier jusqu'a regularisation."],
+      ...(settings.includePayments ? ([["Montant déjà payé", money(client.paid_amount)]] as [string, string][]) : []),
+      ["section", "Modalités de paiement"],
+      ["Texte", "Le client reconnaît devoir les montants restant dus selon les conditions convenues avec Accès Canada."],
+      ["Texte", "Tout retard de paiement peut suspendre le traitement administratif du dossier jusqu'à régularisation."],
       ["section", "Tableau des paiements"],
       ["Paiement 1", "Date: ____________   Montant: ____________   Mode: ____________"],
       ["Paiement 2", "Date: ____________   Montant: ____________   Mode: ____________"],
@@ -164,14 +168,14 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
       ...baseInfo(client, settings),
       ...(settings.includeDocuments
         ? ([
-            ["section", "Documents recus"],
+            ["section", "Documents reçus"],
             ...received.map((item) => ["[x]", item] as [string, string]),
             ["section", "Documents manquants"],
             ...missing.map((item) => ["[ ]", item] as [string, string]),
           ] as [string, string][])
         : []),
       ["section", "Suivi"],
-      ["Texte", "Cette liste est mise a jour selon les documents transmis par le client et les exigences du type de demande."],
+      ["Texte", "Cette liste est mise à jour selon les documents transmis par le client et les exigences du type de demande."],
       ...notesRows(client, settings),
     ];
   }
@@ -179,13 +183,13 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
   if (type === "lettre-explicative") {
     return [
       ["section", "Objet"],
-      ["Texte", "Cette lettre vise a presenter clairement le contexte, le projet et les elements administratifs du dossier."],
+      ["Texte", "Cette lettre vise à présenter clairement le contexte, le projet et les éléments administratifs du dossier."],
       ["section", "Informations du demandeur"],
       ...baseInfo(client, settings),
-      ["section", "Declaration"],
+      ["section", "Déclaration"],
       [
         "Texte",
-        "Le demandeur souhaite soumettre un dossier complet, coherent et conforme aux exigences applicables. Les informations fournies devront etre accompagnees des pieces justificatives pertinentes.",
+        "Le demandeur souhaite soumettre un dossier complet, cohérent et conforme aux exigences applicables. Les informations fournies devront être accompagnées des pièces justificatives pertinentes.",
       ],
       ...notesRows(client, settings),
       ...signatureRows(settings),
@@ -195,15 +199,15 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
   if (type === "lettre-soutien-financier") {
     return [
       ["section", "Objet"],
-      ["Texte", "Cette lettre confirme l'intention de soutien financier dans le cadre du projet d'immigration ou de sejour au Canada."],
-      ["section", "Beneficiaire"],
+      ["Texte", "Cette lettre confirme l'intention de soutien financier dans le cadre du projet d'immigration ou de séjour au Canada."],
+      ["section", "Bénéficiaire"],
       ...baseInfo(client, settings),
       ["section", "Engagement"],
       [
         "Texte",
-        "Le signataire confirme etre dispose a soutenir financierement le beneficiaire selon les besoins du dossier et les justificatifs presentes.",
+        "Le signataire confirme être disposé à soutenir financièrement le bénéficiaire selon les besoins du dossier et les justificatifs présentés.",
       ],
-      ...(settings.includePayments ? ([["Montant de reference", money(client.paid_amount)]] as [string, string][]) : []),
+      ...(settings.includePayments ? ([["Montant de référence", money(client.paid_amount)]] as [string, string][]) : []),
       ...signatureRows(settings),
     ];
   }
@@ -211,13 +215,13 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
   if (type === "lettre-invitation") {
     return [
       ["section", "Objet"],
-      ["Texte", "Cette lettre est preparee pour soutenir une invitation temporaire au Canada, sous reserve des renseignements fournis."],
-      ["section", "Personne invitee"],
+      ["Texte", "Cette lettre est préparée pour soutenir une invitation temporaire au Canada, sous réserve des renseignements fournis."],
+      ["section", "Personne invitée"],
       ...baseInfo(client, settings),
       ["section", "Contexte de l'invitation"],
       [
         "Texte",
-        "L'invitation devra preciser le lien avec l'hote, la duree prevue du sejour, l'adresse d'accueil et les responsabilites pendant le sejour.",
+        "L'invitation devra préciser le lien avec l'hôte, la durée prévue du séjour, l'adresse d'accueil et les responsabilités pendant le séjour.",
       ],
       ...signatureRows(settings),
     ];
@@ -225,33 +229,33 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
 
   if (type === "recu-paiement") {
     return [
-      ["Recu", `RECU-${client.id.slice(0, 8).toUpperCase()}`],
+      ["Reçu", `RECU-${client.id.slice(0, 8).toUpperCase()}`],
       ["Date", issued],
       ["section", "Client"],
       ...baseInfo(client, settings),
       ["section", "Paiement"],
-      ["Montant recu", money(client.paid_amount)],
-      ["Mode de paiement", "A confirmer"],
+      ["Montant reçu", money(client.paid_amount)],
+      ["Mode de paiement", "À confirmer"],
       ["Description", serviceLabels[client.service as ServiceType] || client.service],
       ["section", "Confirmation"],
-      ["Texte", "Acces Canada confirme la reception du paiement indique pour le dossier mentionne ci-dessus."],
+      ["Texte", "Accès Canada confirme la réception du paiement indiqué pour le dossier mentionné ci-dessus."],
     ];
   }
 
   const subtotal = Number(client.paid_amount || 0);
   return [
     ["Facture", `FACT-${client.id.slice(0, 8).toUpperCase()}`],
-    ["Date d'emission", issued],
-    ["Statut", subtotal > 0 ? "Payee / acompte recu" : "En attente"],
+    ["Date d'émission", issued],
+    ["Statut", subtotal > 0 ? "Payée / acompte reçu" : "En attente"],
     ["section", "Client"],
     ...baseInfo(client, settings),
     ["section", "Services"],
     [serviceLabels[client.service as ServiceType] || client.service, money(subtotal)],
     ["Sous-total", money(subtotal)],
-    ["Taxes", "A completer"],
-    ["Total a payer", money(subtotal)],
+    ["Taxes", "À compléter"],
+    ["Total à payer", money(subtotal)],
     ["section", "Mode de paiement"],
-    ["Texte", "A completer ulterieurement par Acces Canada."],
+    ["Texte", "À compléter ultérieurement par Accès Canada."],
     ["section", "Remarques"],
     ...(settings.includeNotes ? ([["Texte", client.internal_notes || client.notes || "Merci pour votre confiance."]] as [string, string][]) : []),
   ];
@@ -268,29 +272,32 @@ export function generateClientPdf(client: AdminClient, type: ClientDocumentType,
   const content: string[] = [];
   let y = 760;
 
+  content.push("q 0.98 0.965 0.925 rg 0 0 612 792 re f Q\n");
   content.push("q 0.043 0.114 0.212 rg 0 720 612 72 re f Q\n");
   content.push("q 0.831 0.686 0.216 rg 36 706 540 3 re f Q\n");
   content.push("q 0.831 0.686 0.216 rg 36 734 46 46 re f Q\n");
   content.push("q 0.8 0.063 0.18 rg 42 740 34 34 re f Q\n");
   content.push("BT /F2 16 Tf 1 1 1 rg 48 752 Td (AC) Tj ET\n");
-  content.push("BT /F2 21 Tf 1 1 1 rg 96 756 Td (ACCES CANADA) Tj ET\n");
+  content.push("BT /F2 21 Tf 1 1 1 rg 96 756 Td (ACCÈS CANADA) Tj ET\n");
   content.push("BT /F1 9 Tf 1 1 1 rg 96 738 Td (Votre chemin vers le Canada, notre engagement.) Tj ET\n");
   content.push("BT /F1 8 Tf 1 1 1 rg 390 756 Td (+1 819-266-8420) Tj ET\n");
   content.push("BT /F1 8 Tf 1 1 1 rg 390 742 Td (accesc625@gmail.com) Tj ET\n");
-  content.push(`BT /F2 18 Tf 0.043 0.114 0.212 rg 36 682 Td (${safe(title)}) Tj ET\n`);
-  content.push(`BT /F1 10 Tf 0.2 0.2 0.2 rg 36 664 Td (Genere le ${safe(dateFr(new Date().toISOString()))}) Tj ET\n`);
+  content.push(`BT /F2 19 Tf 0.043 0.114 0.212 rg 36 682 Td (${safe(title)}) Tj ET\n`);
+  content.push(`BT /F1 10 Tf 0.2 0.2 0.2 rg 36 664 Td (${safe(`Généré le ${dateFr(new Date().toISOString())}`)}) Tj ET\n`);
+  content.push(`BT /F2 10 Tf 0.8 0.063 0.18 rg 390 664 Td (${safe(client.file_reference || "Référence à créer")}) Tj ET\n`);
   y = 628;
 
   rows.forEach(([label, value]) => {
     if (label === "section") {
       y -= 12;
-      content.push(`q 0.831 0.686 0.216 rg 36 ${y + 11} 170 1.5 re f Q\n`);
+      content.push(`q 0.831 0.686 0.216 rg 36 ${y + 11} 180 1.5 re f Q\n`);
       content.push(`BT /F2 13 Tf 0.043 0.114 0.212 rg 36 ${y} Td (${safe(value)}) Tj ET\n`);
       y -= 28;
       return;
     }
 
     const wrapped = safe(value).match(/.{1,74}(\s|$)|.{1,74}/g) || [safe(value)];
+    content.push(`q 1 1 1 rg 36 ${y - Math.max(14, wrapped.length * 13) - 8} 540 ${Math.max(24, wrapped.length * 13 + 11)} re f Q\n`);
     content.push(`BT /F2 9 Tf 0.043 0.114 0.212 rg 36 ${y} Td (${safe(label)}) Tj ET\n`);
     wrapped.forEach((line, index) => {
       content.push(`BT /F1 10 Tf 0.12 0.12 0.12 rg 180 ${y - index * 13} Td (${line.trim()}) Tj ET\n`);
@@ -312,8 +319,8 @@ export function generateClientPdf(client: AdminClient, type: ClientDocumentType,
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
     offsets,
   );
-  writeObject(parts, 4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", offsets);
-  writeObject(parts, 5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>", offsets);
+  writeObject(parts, 4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>", offsets);
+  writeObject(parts, 5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>", offsets);
   writeObject(parts, 6, `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`, offsets);
 
   const xref = parts.join("").length;

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,14 +48,14 @@ export function ClientDossierActions({ clientId, clientName }: { clientId: strin
       <div className="rounded-[1.5rem] border border-gold/25 bg-gold/10 p-4">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-navy/52">Documents automatiques</p>
         <p className="mt-2 text-sm font-bold leading-6 text-navy/66">
-          Creez une convention, facture, recu, reconnaissance de dette, checklist ou lettre explicative a partir de ce dossier.
+          Créez une convention, une facture, un reçu, une reconnaissance de dette, une checklist ou une lettre explicative à partir de ce dossier.
         </p>
         <Link
           href={`/admin/documents/generation?clientId=${clientId}`}
           className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-black text-navy transition hover:bg-navy hover:text-white"
         >
           <FilePlus2 className="h-4 w-4" />
-          Generer document
+          Générer un document
         </Link>
       </div>
     </div>

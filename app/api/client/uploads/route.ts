@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getClientSession } from "@/lib/client-auth";
 import { createClientUpload, listClientUploads, markClientUploadReceived, uploadClientFile } from "@/lib/client-portal";
 
@@ -9,19 +9,19 @@ const maxSize = 8 * 1024 * 1024;
 
 export async function GET() {
   const session = await getClientSession();
-  if (!session) return NextResponse.json({ message: "Non autorise." }, { status: 401 });
+  if (!session) return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
 
   try {
     return NextResponse.json({ uploads: await listClientUploads(session.clientId) });
   } catch (error) {
     console.error("Erreur liste uploads client:", error);
-    return NextResponse.json({ message: "Impossible de charger les documents envoyes." }, { status: 500 });
+    return NextResponse.json({ message: "Impossible de charger les documents envoyés." }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   const session = await getClientSession();
-  if (!session) return NextResponse.json({ message: "Non autorise." }, { status: 401 });
+  if (!session) return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
 
   try {
     const formData = await request.formData();

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Download, FileText, UploadCloud } from "lucide-react";
 import { ClientPanel, ClientShell } from "@/components/client/ClientShell";
@@ -7,6 +7,7 @@ import { getClientSession } from "@/lib/client-auth";
 import { getClient } from "@/lib/admin-data";
 import { listGeneratedDocumentsForClient } from "@/lib/admin-documents";
 import { listClientUploads } from "@/lib/client-portal";
+import { formatDateFr } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Documents client",
@@ -29,9 +30,9 @@ export default async function ClientDocumentsPage() {
       <div className="space-y-8">
         <section>
           <p className="text-sm font-black uppercase tracking-[0.24em] text-canada">Documents</p>
-          <h1 className="mt-3 font-display text-4xl font-black text-navy md:text-6xl">Depots et telechargements</h1>
+          <h1 className="mt-3 font-display text-4xl font-black text-navy md:text-6xl">Dépôts et téléchargements</h1>
           <p className="mt-4 max-w-3xl leading-8 text-navy/62">
-            Espace de {client.full_name}. Envoyez vos pieces justificatives et telechargez les documents prepares par Acces Canada.
+            Espace de {client.full_name}. Envoyez vos pièces justificatives et téléchargez les documents préparés par Accès Canada.
           </p>
         </section>
 
@@ -40,7 +41,7 @@ export default async function ClientDocumentsPage() {
             <ClientUploadForm initialUploads={uploads} />
           </ClientPanel>
 
-          <ClientPanel title="Documents generes par Acces Canada" icon={<FileText className="h-5 w-5" />}>
+          <ClientPanel title="Documents générés par Accès Canada" icon={<FileText className="h-5 w-5" />}>
             <div className="space-y-3">
               {generatedDocuments.length ? (
                 generatedDocuments.map((document) => (
@@ -51,7 +52,7 @@ export default async function ClientDocumentsPage() {
                   >
                     <span>
                       <span className="block">{document.document_label}</span>
-                      <span className="mt-1 block text-xs text-navy/42">{new Date(document.created_at).toLocaleDateString("fr-CA")}</span>
+                      <span className="mt-1 block text-xs text-navy/42">{formatDateFr(document.created_at)}</span>
                     </span>
                     <Download className="h-4 w-4" />
                   </a>

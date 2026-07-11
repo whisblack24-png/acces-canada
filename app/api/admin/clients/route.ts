@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import {
   adminErrorMessage,
@@ -8,6 +8,7 @@ import {
   sanitizeClientInput,
   validateClientInput,
 } from "@/lib/admin-data";
+import { notifyDossierCreated } from "@/lib/production-workflow";
 
 export const runtime = "nodejs";
 
@@ -42,7 +43,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    return NextResponse.json({ client: await createClient(input) }, { status: 201 });
+    const client = await createClient(input);
+    notifyDossierCreated(client).catch((error) => console.error("Notification création dossier non envoyée:", error));
+    return NextResponse.json({ client }, { status: 201 });
   } catch (error) {
     logSupabaseError("Erreur création client", error);
     return NextResponse.json({ message: `Impossible de créer le client. ${adminErrorMessage(error)}` }, { status: 500 });

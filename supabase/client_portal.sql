@@ -1,4 +1,4 @@
--- Acces Canada - Portail client securise
+﻿-- Accès Canada - Portail client sécurisé
 -- A executer dans Supabase SQL Editor avant d'utiliser /client/login.
 
 alter table public.admin_clients

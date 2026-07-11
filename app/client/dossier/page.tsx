@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CalendarClock, FileCheck2, FileText, FolderKanban, Mail, Phone } from "lucide-react";
 import { ClientPanel, ClientShell } from "@/components/client/ClientShell";
 import { getClientSession } from "@/lib/client-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
 import type { ServiceType } from "@/lib/admin-data";
+import { formatDateFr } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Mon dossier",
@@ -23,30 +24,30 @@ export default async function ClientDossierPage() {
         <section>
           <p className="text-sm font-black uppercase tracking-[0.24em] text-canada">Mon dossier</p>
           <h1 className="mt-3 font-display text-4xl font-black text-navy md:text-6xl">{client.full_name}</h1>
-          <p className="mt-4 max-w-3xl leading-8 text-navy/62">Consultez les informations principales de votre dossier Acces Canada.</p>
+          <p className="mt-4 max-w-3xl leading-8 text-navy/62">Consultez les informations principales de votre dossier Accès Canada.</p>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <ClientPanel title="Informations" icon={<FolderKanban className="h-5 w-5" />}>
             <Info label="Service" value={serviceLabels[client.service as ServiceType] || client.service} />
             <Info label="Statut" value={statusLabels[client.status] || client.status} />
-            <Info label="Reference" value={client.file_reference || "A creer"} />
-            <Info label="Date de creation" value={new Date(client.created_at).toLocaleDateString("fr-CA")} icon={<CalendarClock className="h-4 w-4" />} />
+            <Info label="Référence" value={client.file_reference || "À créer"} />
+            <Info label="Date de création" value={formatDateFr(client.created_at)} icon={<CalendarClock className="h-4 w-4" />} />
           </ClientPanel>
 
-          <ClientPanel title="Coordonnees" icon={<Mail className="h-5 w-5" />}>
+          <ClientPanel title="Coordonnées" icon={<Mail className="h-5 w-5" />}>
             <Info label="Courriel" value={client.email} icon={<Mail className="h-4 w-4" />} />
-            <Info label="Telephone" value={client.phone || "Non renseigne"} icon={<Phone className="h-4 w-4" />} />
-            <Info label="Pays" value={client.country || "Non renseigne"} />
+            <Info label="Téléphone" value={client.phone || "Non renseigné"} icon={<Phone className="h-4 w-4" />} />
+            <Info label="Pays" value={client.country || "Non renseigné"} />
           </ClientPanel>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <ClientPanel title="Documents recus" icon={<FileCheck2 className="h-5 w-5" />}>
-            <List items={client.documents_received || []} empty="Aucun document recu indique." />
+          <ClientPanel title="Documents reçus" icon={<FileCheck2 className="h-5 w-5" />}>
+            <List items={client.documents_received || []} empty="Aucun document reçu indiqué." />
           </ClientPanel>
           <ClientPanel title="Documents manquants" icon={<FileText className="h-5 w-5" />}>
-            <List items={client.documents_missing || []} empty="Aucun document manquant indique." />
+            <List items={client.documents_missing || []} empty="Aucun document manquant indiqué." />
           </ClientPanel>
         </div>
 

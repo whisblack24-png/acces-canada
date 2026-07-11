@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
 import { brand } from "@/lib/site";

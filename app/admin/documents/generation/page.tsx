@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -9,7 +9,7 @@ import { listClients } from "@/lib/admin-data";
 import { listGeneratedDocuments } from "@/lib/admin-documents";
 
 export const metadata: Metadata = {
-  title: "Generation de documents",
+  title: "Génération de documents",
 };
 
 export const dynamic = "force-dynamic";
@@ -39,10 +39,10 @@ export default async function AdminDocumentGenerationPage({ searchParams }: Page
         </Link>
 
         <section className="rounded-[2rem] bg-navy p-7 text-white shadow-premium md:p-10">
-          <p className="text-sm font-black uppercase tracking-[0.24em] text-gold">Generation automatique</p>
+          <p className="text-sm font-black uppercase tracking-[0.24em] text-gold">Génération automatique</p>
           <h1 className="mt-4 font-display text-4xl font-black md:text-6xl">Creer un PDF client.</h1>
           <p className="mt-5 max-w-3xl leading-8 text-white/66">
-            Selectionnez un client, choisissez le type de document, puis generez un PDF professionnel Acces Canada
+            Sélectionnez un client, choisissez le type de document, puis générez un PDF professionnel Accès Canada
             automatiquement sauvegarde dans Supabase et disponible dans l'historique du dossier.
           </p>
         </section>

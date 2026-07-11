@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient } from "@/lib/admin-data";
 import { getGeneratedDocument } from "@/lib/admin-documents";
@@ -12,7 +12,7 @@ type Context = {
 
 export async function GET(_request: Request, context: Context) {
   if (!(await isAdminAuthenticated())) {
-    return NextResponse.json({ message: "Non autorise." }, { status: 401 });
+    return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
   }
 
   const { id } = await context.params;

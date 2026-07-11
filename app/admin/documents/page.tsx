@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FilePlus2 } from "lucide-react";
@@ -31,7 +31,7 @@ export default async function AdminDocumentsPage() {
               <p className="text-sm font-black uppercase tracking-[0.24em] text-gold">Module Documents</p>
               <h1 className="mt-4 font-display text-4xl font-black md:text-6xl">Bibliotheque administrative.</h1>
               <p className="mt-5 max-w-3xl leading-8 text-white/66">
-                Generez des documents professionnels Acces Canada a partir des informations clients du CRM, puis gardez un
+                Générez des documents professionnels Accès Canada à partir des informations clients du CRM, puis gardez un
                 historique clair des fichiers produits.
               </p>
             </div>
@@ -40,7 +40,7 @@ export default async function AdminDocumentsPage() {
               className="inline-flex items-center justify-center gap-2 rounded-full bg-gold px-6 py-3 text-sm font-black text-navy transition hover:bg-white"
             >
               <FilePlus2 className="h-4 w-4" />
-              Generer document
+              Générer un document
             </Link>
           </div>
         </section>

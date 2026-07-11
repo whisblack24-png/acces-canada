@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { ContactForm } from "@/components/ContactForm";
 import { InteriorHero } from "@/components/InteriorHero";
 import { Reveal } from "@/components/Reveal";

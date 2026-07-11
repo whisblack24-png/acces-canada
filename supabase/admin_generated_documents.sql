@@ -1,4 +1,4 @@
--- Acces Canada - historique des documents generes
+﻿-- Accès Canada - historique des documents générés
 -- A executer dans Supabase SQL Editor pour activer le module /admin/documents.
 
 create table if not exists public.admin_generated_documents (

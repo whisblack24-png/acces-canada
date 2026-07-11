@@ -1,4 +1,4 @@
-import {
+﻿import {
   Award,
   BadgeCheck,
   BriefcaseBusiness,
@@ -36,8 +36,8 @@ export const brand = {
 };
 
 export const navItems = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
+  { label: "Accueil", href: "/" },
+  { label: "À propos", href: "/about" },
   { label: "Services", href: "/services" },
   { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" }
@@ -187,7 +187,7 @@ export const faqs = [
 
 export const contactMethods = [
   { icon: Phone, label: "Téléphone", value: brand.phone, href: `tel:${brand.phone.replaceAll(" ", "")}` },
-  { icon: Mail, label: "Email", value: brand.email, href: `mailto:${brand.email}` },
+  { icon: Mail, label: "Courriel", value: brand.email, href: `mailto:${brand.email}` },
   { icon: MapPinned, label: "Zone de service", value: "Canada et international", href: "/contact" }
 ];
 

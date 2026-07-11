@@ -1,14 +1,18 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, FileText, FolderKanban, UploadCloud } from "lucide-react";
+import { CheckCircle2, CreditCard, FileSignature, FileText, FolderKanban, UploadCloud } from "lucide-react";
 import { ClientPanel, ClientShell } from "@/components/client/ClientShell";
 import { ClientUploadForm } from "@/components/client/ClientUploadForm";
+import { ClientPaymentPanel, ClientSignaturePanel } from "@/components/client/ClientProductionActions";
 import { getClientSession } from "@/lib/client-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
 import { listGeneratedDocumentsForClient } from "@/lib/admin-documents";
 import { listClientUploads } from "@/lib/client-portal";
 import type { ServiceType } from "@/lib/admin-data";
+import { formatDateFr } from "@/lib/format";
+import { formatDateTimeFr, listAppointmentsForEmail } from "@/lib/booking";
+import { listClientPayments, listClientSignatures } from "@/lib/production-workflow";
 
 export const metadata: Metadata = {
   title: "Tableau de bord client",
@@ -21,9 +25,12 @@ export default async function ClientDashboardPage() {
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) redirect("/client/login");
 
-  const [uploads, documents] = await Promise.all([
+  const [uploads, documents, signatures, payments, appointments] = await Promise.all([
     listClientUploads(client.id).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
+    listClientSignatures(client.id).catch(() => []),
+    listClientPayments(client.id).catch(() => []),
+    listAppointmentsForEmail(client.email).catch(() => []),
   ]);
 
   return (
@@ -33,23 +40,23 @@ export default async function ClientDashboardPage() {
           <p className="text-sm font-black uppercase tracking-[0.24em] text-gold">Bienvenue</p>
           <h1 className="mt-4 font-display text-4xl font-black md:text-6xl">{client.full_name}</h1>
           <p className="mt-5 max-w-3xl leading-8 text-white/66">
-            Suivez l'etat de votre dossier, deposez vos documents et telechargez les pieces preparees par Acces Canada.
+            Suivez l'état de votre dossier, déposez vos documents et téléchargez les pièces préparées par Accès Canada.
           </p>
         </section>
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <Stat label="Statut" value={statusLabels[client.status] || client.status} />
           <Stat label="Service" value={serviceLabels[client.service as ServiceType] || client.service} />
-          <Stat label="Reference" value={client.file_reference || "A creer"} />
-          <Stat label="Documents" value={`${uploads.length} envoyes / ${documents.length} generes`} />
+          <Stat label="Référence" value={client.file_reference || "À créer"} />
+          <Stat label="Documents" value={`${uploads.length} envoyés / ${documents.length} générés`} />
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <ClientPanel title="Documents manquants" icon={<FileText className="h-5 w-5" />}>
-            <DocumentList items={client.documents_missing || []} empty="Aucun document manquant indique." />
+            <DocumentList items={client.documents_missing || []} empty="Aucun document manquant indiqué." />
           </ClientPanel>
-          <ClientPanel title="Documents recus" icon={<CheckCircle2 className="h-5 w-5" />}>
-            <DocumentList items={client.documents_received || []} empty="Aucun document recu indique." />
+          <ClientPanel title="Documents reçus" icon={<CheckCircle2 className="h-5 w-5" />}>
+            <DocumentList items={client.documents_received || []} empty="Aucun document reçu indiqué." />
           </ClientPanel>
         </div>
 
@@ -66,8 +73,39 @@ export default async function ClientDashboardPage() {
           </div>
         </ClientPanel>
 
+        <div className="grid gap-6 xl:grid-cols-2">
+          <ClientPanel title="Signatures électroniques" icon={<FileSignature className="h-5 w-5" />}>
+            <ClientSignaturePanel initialSignatures={signatures} />
+          </ClientPanel>
+          <ClientPanel title="Paiements sécurisés" icon={<CreditCard className="h-5 w-5" />}>
+            <ClientPaymentPanel initialPayments={payments} />
+          </ClientPanel>
+        </div>
+
+        <ClientPanel title="Factures de consultation" icon={<CreditCard className="h-5 w-5" />}>
+          <div className="space-y-3">
+            {appointments.length ? (
+              appointments.map((appointment) => (
+                <a
+                  key={appointment.id}
+                  href={`/api/booking/invoice/${appointment.id}`}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74 transition hover:bg-gold/15"
+                >
+                  <span>
+                    <span className="block">{appointment.invoice_number}</span>
+                    <span className="mt-1 block text-xs text-navy/42">{formatDateTimeFr(appointment.starts_at)}</span>
+                  </span>
+                  Télécharger
+                </a>
+              ))
+            ) : (
+              <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucune facture de consultation disponible.</p>
+            )}
+          </div>
+        </ClientPanel>
+
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-          <ClientPanel title="Depot rapide" icon={<UploadCloud className="h-5 w-5" />}>
+          <ClientPanel title="Dépôt rapide" icon={<UploadCloud className="h-5 w-5" />}>
             <ClientUploadForm initialUploads={uploads.slice(0, 5)} />
           </ClientPanel>
 
@@ -82,13 +120,13 @@ export default async function ClientDashboardPage() {
                   >
                     <span>
                       <span className="block">{document.document_label}</span>
-                      <span className="mt-1 block text-xs text-navy/42">{new Date(document.created_at).toLocaleDateString("fr-CA")}</span>
+                      <span className="mt-1 block text-xs text-navy/42">{formatDateFr(document.created_at)}</span>
                     </span>
-                    Telecharger
+                    Télécharger
                   </a>
                 ))
               ) : (
-                <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document genere pour le moment.</p>
+                <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document généré pour le moment.</p>
               )}
             </div>
           </ClientPanel>

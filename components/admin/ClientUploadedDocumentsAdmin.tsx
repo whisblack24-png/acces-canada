@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { Download, Trash2 } from "lucide-react";
 import type { ClientUploadedDocument } from "@/lib/client-portal";
+import { formatDateFr } from "@/lib/format";
 
 export function ClientUploadedDocumentsAdmin({
   clientId,
@@ -31,7 +32,7 @@ export function ClientUploadedDocumentsAdmin({
   }
 
   if (!documents.length) {
-    return <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document envoye par le client.</p>;
+    return <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document envoyé par le client.</p>;
   }
 
   return (
@@ -41,15 +42,15 @@ export function ClientUploadedDocumentsAdmin({
           <span className="min-w-0">
             <span className="block truncate">{document.file_name}</span>
             <span className="mt-1 block text-xs text-navy/42">
-              {new Date(document.created_at).toLocaleDateString("fr-CA")}
+              {formatDateFr(document.created_at)}
               {document.file_size ? ` - ${(document.file_size / 1024).toFixed(1)} Ko` : ""}
             </span>
           </span>
           <span className="flex shrink-0 gap-2">
             <a
               href={`/api/admin/client-uploads/${document.id}/download?clientId=${clientId}`}
-              aria-label="Telecharger"
-              title="Telecharger"
+              aria-label="Télécharger"
+              title="Télécharger"
               className="grid h-9 w-9 place-items-center rounded-full bg-gold/20 text-navy transition hover:bg-gold"
             >
               <Download className="h-4 w-4" />

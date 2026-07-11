@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import {
   adminErrorMessage,
@@ -6,9 +6,12 @@ import {
   getClient,
   logSupabaseError,
   sanitizeClientInput,
+  statusLabels,
   updateClient,
   validateClientInput,
 } from "@/lib/admin-data";
+import { formatMoney } from "@/lib/format";
+import { notifyStatusChanged } from "@/lib/production-workflow";
 
 export const runtime = "nodejs";
 
@@ -55,11 +58,25 @@ export async function PATCH(request: Request, context: Context) {
 
   try {
     const existing = await getClient(id);
+    const changes = [
+      existing?.status && existing.status !== input.status ? `Statut modifié: ${existing.status} -> ${input.status}.` : "",
+      existing?.paid_amount !== undefined && Number(existing.paid_amount || 0) !== Number(input.paid_amount || 0)
+        ? `Paiement mis à jour: ${formatMoney(Number(input.paid_amount || 0))}.`
+        : "",
+      existing?.documents_received?.join("|") !== input.documents_received?.join("|") ||
+      existing?.documents_missing?.join("|") !== input.documents_missing?.join("|")
+        ? "Liste documentaire mise à jour."
+        : "",
+    ].filter(Boolean);
     input.action_history = [
       ...(existing?.action_history || []),
-      { date: new Date().toISOString(), action: "Dossier client modifié dans le CRM." },
+      { date: new Date().toISOString(), action: changes.join(" ") || "Dossier client modifié dans le CRM." },
     ].slice(-100);
-    return NextResponse.json({ client: await updateClient(id, input) });
+    const updated = await updateClient(id, input);
+    if (existing?.status && existing.status !== input.status) {
+      notifyStatusChanged(updated, statusLabels[input.status] || input.status).catch((error) => console.error("Notification statut non envoyée:", error));
+    }
+    return NextResponse.json({ client: updated });
   } catch (error) {
     logSupabaseError("Erreur modification client", error);
     return NextResponse.json({ message: `Impossible de modifier le client. ${adminErrorMessage(error)}` }, { status: 500 });

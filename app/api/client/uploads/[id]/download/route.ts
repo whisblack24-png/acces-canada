@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getClientSession } from "@/lib/client-auth";
 import { downloadClientFile } from "@/lib/client-portal";
 
@@ -10,7 +10,7 @@ type Context = {
 
 export async function GET(_request: Request, context: Context) {
   const session = await getClientSession();
-  if (!session) return NextResponse.json({ message: "Non autorise." }, { status: 401 });
+  if (!session) return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
 
   const { id } = await context.params;
   const result = await downloadClientFile(session.clientId, id).catch((error) => {

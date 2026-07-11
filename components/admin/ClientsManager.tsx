@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { Edit3, Eye, FileText, Plus, Trash2, X } from "lucide-react";
 import { dossierStatuses, serviceLabels, serviceTypes, statusLabels } from "@/lib/admin-data";
 import type { AdminClient, ClientInput, ClientStatus, ServiceType } from "@/lib/admin-data";
+import { formatMoney } from "@/lib/format";
 
 const emptyForm: ClientInput = {
   full_name: "",
@@ -45,7 +46,10 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
   const stats = useMemo(
     () => ({
       total: clients.length,
-      active: clients.filter((client) => ["en_attente", "incomplet", "en_traitement"].includes(client.status)).length,
+      active: clients.filter((client) =>
+        ["nouveau", "documents_en_attente", "en_preparation", "soumis", "en_traitement", "approuve"].includes(client.status),
+      ).length,
+      completed: clients.filter((client) => client.status === "termine").length,
       revenue: clients.reduce((sum, client) => sum + Number(client.paid_amount || 0), 0),
     }),
     [clients],
@@ -130,10 +134,11 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
             <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">CRM Clients</p>
             <h2 className="mt-2 font-display text-3xl font-black text-navy">Portefeuille clients</h2>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 gap-2 text-center xl:grid-cols-4">
             <MiniStat label="Clients" value={stats.total.toString()} />
             <MiniStat label="Actifs" value={stats.active.toString()} />
-            <MiniStat label="Revenus" value={`${stats.revenue.toLocaleString("fr-CA")} $`} />
+            <MiniStat label="Terminés" value={stats.completed.toString()} />
+            <MiniStat label="Revenus" value={formatMoney(stats.revenue)} />
           </div>
         </div>
 
@@ -226,7 +231,12 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
               </select>
             </label>
 
-            <Input label="Référence dossier" value={form.file_reference || ""} onChange={(value) => setForm({ ...form, file_reference: value })} />
+            <Input
+              label="Référence dossier"
+              value={form.file_reference || ""}
+              onChange={(value) => setForm({ ...form, file_reference: value })}
+              placeholder="Automatique si laissé vide"
+            />
             <Input
               label="Montant payé"
               type="number"
@@ -282,7 +292,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
               <Detail label="Service" value={serviceLabels[selected.service as ServiceType] || selected.service} />
               <Detail label="Statut" value={statusLabels[selected.status] || selected.status} />
               <Detail label="Référence" value={selected.file_reference || "À créer"} />
-              <Detail label="Paiements" value={`${Number(selected.paid_amount || 0).toLocaleString("fr-CA")} $`} />
+              <Detail label="Paiements" value={formatMoney(Number(selected.paid_amount || 0))} />
               <div className="rounded-2xl bg-white/8 p-4">
                 <span className="block text-xs font-black uppercase tracking-[0.16em] text-white/42">Notes</span>
                 <p className="mt-2 text-sm leading-6 text-white/72">
@@ -321,12 +331,14 @@ function Input({
   onChange,
   type = "text",
   required = false,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   required?: boolean;
+  placeholder?: string;
 }) {
   return (
     <label className="block text-sm font-bold text-navy/70">
@@ -336,6 +348,7 @@ function Input({
         required={required}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
         className="mt-2 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
       />
     </label>

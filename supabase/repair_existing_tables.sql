@@ -1,4 +1,4 @@
--- Correctif non destructif pour aligner les tables Supabase existantes
+﻿-- Correctif non destructif pour aligner les tables Supabase existantes
 -- avec le code actuel d'Accès Canada.
 -- À exécuter dans Supabase > SQL Editor.
 

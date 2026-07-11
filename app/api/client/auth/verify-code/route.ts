@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { setClientSession } from "@/lib/client-auth";
 import { verifyLoginCode } from "@/lib/client-portal";
 
@@ -16,12 +16,12 @@ export async function POST(request: Request) {
 
     const session = await verifyLoginCode(cleanEmail, cleanCode);
     if (!session) {
-      return NextResponse.json({ message: "Code invalide ou expire." }, { status: 401 });
+      return NextResponse.json({ message: "Code invalide ou expiré." }, { status: 401 });
     }
 
     return setClientSession(NextResponse.json({ message: "Connexion reussie." }), session.clientId, session.email);
   } catch (error) {
-    console.error("Erreur verification code client:", error);
+    console.error("Erreur vérification code client:", error);
     return NextResponse.json({ message: "Impossible de verifier le code." }, { status: 500 });
   }
 }

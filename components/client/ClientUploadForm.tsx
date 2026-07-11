@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UploadCloud } from "lucide-react";
 import type { ClientUploadedDocument } from "@/lib/client-portal";
+import { formatDateFr } from "@/lib/format";
 
 export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUploadedDocument[] }) {
   const router = useRouter();
@@ -28,7 +29,7 @@ export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUpl
     }
 
     setUploads([result.upload, ...uploads]);
-    setFeedback("Document envoye avec succes.");
+    setFeedback("Document envoyé avec succès.");
     form.reset();
     router.refresh();
   }
@@ -59,13 +60,13 @@ export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUpl
             <a key={upload.id} href={`/api/client/uploads/${upload.id}/download`} className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74 transition hover:bg-gold/15">
               <span>
                 <span className="block">{upload.file_name}</span>
-                <span className="mt-1 block text-xs text-navy/42">{new Date(upload.created_at).toLocaleDateString("fr-CA")}</span>
+                <span className="mt-1 block text-xs text-navy/42">{formatDateFr(upload.created_at)}</span>
               </span>
-              Telecharger
+              Télécharger
             </a>
           ))
         ) : (
-          <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document envoye pour le moment.</p>
+          <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document envoyé pour le moment.</p>
         )}
       </div>
     </div>

@@ -1,4 +1,16 @@
-export type ClientStatus = "nouveau" | "en_attente" | "incomplet" | "en_traitement" | "termine" | "refuse";
+﻿export type ClientStatus =
+  | "nouveau"
+  | "documents_recus"
+  | "en_analyse"
+  | "en_attente"
+  | "depose"
+  | "termine"
+  | "documents_en_attente"
+  | "en_preparation"
+  | "soumis"
+  | "en_traitement"
+  | "approuve"
+  | "refuse";
 export type ServiceType = "visa_visiteur" | "permis_etudes" | "permis_travail" | "residence_permanente" | "autre";
 
 export type ActionHistoryItem = {
@@ -43,23 +55,35 @@ export type ClientInput = {
   paid_amount?: number;
 };
 
-export const dossierStatuses: ClientStatus[] = ["nouveau", "en_attente", "incomplet", "en_traitement", "termine", "refuse"];
+export const dossierStatuses: ClientStatus[] = ["nouveau", "documents_recus", "en_analyse", "en_attente", "depose", "termine"];
 export const serviceTypes: ServiceType[] = ["visa_visiteur", "permis_etudes", "permis_travail", "residence_permanente", "autre"];
 
 const legacyStatusMap: Record<string, ClientStatus> = {
   prospect: "nouveau",
-  active: "en_traitement",
+  active: "en_analyse",
   waiting: "en_attente",
+  incomplet: "en_attente",
+  documents_en_attente: "en_attente",
+  en_preparation: "en_analyse",
+  soumis: "depose",
+  en_traitement: "en_analyse",
+  approuve: "termine",
   approved: "termine",
   closed: "termine",
 };
 
 export const statusLabels: Record<ClientStatus, string> = {
   nouveau: "Nouveau",
+  documents_recus: "Documents reçus",
+  en_analyse: "En analyse",
   en_attente: "En attente",
-  incomplet: "Incomplet",
-  en_traitement: "En traitement",
+  depose: "Déposé",
   termine: "Terminé",
+  documents_en_attente: "Documents en attente",
+  en_preparation: "En préparation",
+  soumis: "Soumis",
+  en_traitement: "En traitement",
+  approuve: "Approuvé",
   refuse: "Refusé",
 };
 
@@ -132,9 +156,9 @@ function clientPayload(input: ClientInput, mode: "full" | "compatible" = "full")
     internal_notes: input.internal_notes || null,
     documents_received: input.documents_received || [],
     documents_missing: input.documents_missing || [],
-    action_history: input.action_history?.length ? input.action_history : [
-      { date: new Date().toISOString(), action: "Fiche client mise à jour dans le CRM." },
-    ],
+    action_history: input.action_history?.length
+      ? input.action_history
+      : [{ date: new Date().toISOString(), action: "Dossier client créé dans le CRM." }],
     paid_amount: Number(input.paid_amount || 0),
   };
 }
@@ -225,6 +249,32 @@ export function validateClientInput(input: ClientInput) {
   return null;
 }
 
+async function generateFileReference() {
+  const { url, key, table } = supabaseConfig();
+  const year = new Date().getFullYear();
+  const prefix = `AC-${year}-`;
+  const response = await fetch(
+    `${url}/rest/v1/${table}?select=file_reference&file_reference=like.${encodeURIComponent(`${prefix}%`)}&limit=1000`,
+    {
+      headers: headers(key),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw await supabaseError("Génération référence dossier", response);
+  }
+
+  const rows = (await response.json()) as { file_reference: string | null }[];
+  const lastNumber = rows.reduce((max, row) => {
+    const suffix = row.file_reference?.replace(prefix, "") || "";
+    return /^\d+$/.test(suffix) ? Math.max(max, Number(suffix)) : max;
+  }, 0);
+  const nextNumber = lastNumber + 1;
+
+  return `${prefix}${String(nextNumber).padStart(4, "0")}`;
+}
+
 export async function listClients() {
   const { url, key, table } = supabaseConfig();
   const response = await fetch(`${url}/rest/v1/${table}?select=*&order=created_at.desc`, {
@@ -256,12 +306,19 @@ export async function getClient(id: string) {
 
 export async function createClient(input: ClientInput) {
   const { url, key, table } = supabaseConfig();
+  const clientInput: ClientInput = {
+    ...input,
+    file_reference: input.file_reference || (await generateFileReference()),
+  };
+  clientInput.action_history = clientInput.action_history?.length
+    ? clientInput.action_history
+    : [{ date: new Date().toISOString(), action: `Dossier créé avec la référence ${clientInput.file_reference}.` }];
 
   async function insert(mode: "full" | "compatible") {
     return fetch(`${url}/rest/v1/${table}`, {
       method: "POST",
       headers: { ...headers(key), Prefer: "return=representation" },
-      body: JSON.stringify(clientPayload(input, mode)),
+      body: JSON.stringify(clientPayload(clientInput, mode)),
     });
   }
 
@@ -329,7 +386,11 @@ export async function deleteClient(id: string) {
 }
 
 export function dashboardStats(clients: AdminClient[]) {
-  const active = clients.filter((client) => ["en_attente", "incomplet", "en_traitement"].includes(client.status)).length;
+  const activeStatuses: ClientStatus[] = ["nouveau", "documents_recus", "en_analyse", "en_attente", "depose", "documents_en_attente", "en_preparation", "soumis", "en_traitement", "approuve"];
+  const active = clients.filter((client) => activeStatuses.includes(client.status)).length;
+  const completed = clients.filter((client) => client.status === "termine").length;
+  const refused = clients.filter((client) => client.status === "refuse").length;
+  const pendingPayments = clients.filter((client) => activeStatuses.includes(client.status) && Number(client.paid_amount || 0) <= 0).length;
   const payments = clients.filter((client) => Number(client.paid_amount) > 0).length;
   const revenue = clients.reduce((total, client) => total + Number(client.paid_amount || 0), 0);
 
@@ -337,7 +398,11 @@ export function dashboardStats(clients: AdminClient[]) {
     clients: clients.length,
     appointments: 0,
     active,
+    completed,
+    refused,
+    pendingPayments,
     payments,
     revenue,
   };
 }
+
