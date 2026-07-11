@@ -27,6 +27,7 @@ export type AppointmentInput = {
 };
 
 const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
+const bookingTimeZone = "America/Toronto";
 
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
@@ -57,6 +58,46 @@ async function supabaseError(action: string, response: Response) {
 function addMinutes(value: string | Date, minutes: number) {
   const date = value instanceof Date ? value : new Date(value);
   return new Date(date.getTime() + minutes * 60_000);
+}
+
+function timeZoneOffsetMinutes(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(date)
+    .reduce<Record<string, string>>((values, part) => {
+      if (part.type !== "literal") values[part.type] = part.value;
+      return values;
+    }, {});
+
+  const zonedAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+
+  return (zonedAsUtc - date.getTime()) / 60_000;
+}
+
+function torontoSlotToUtc(date: Date, hours: number, minutes: number) {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const firstPass = new Date(Date.UTC(year, month, day, hours, minutes, 0, 0));
+  const firstOffset = timeZoneOffsetMinutes(firstPass, bookingTimeZone);
+  const secondPass = new Date(Date.UTC(year, month, day, hours, minutes, 0, 0) - firstOffset * 60_000);
+  const secondOffset = timeZoneOffsetMinutes(secondPass, bookingTimeZone);
+  return new Date(Date.UTC(year, month, day, hours, minutes, 0, 0) - secondOffset * 60_000);
 }
 
 function normalizeAppointmentInput(input: AppointmentInput) {
@@ -124,8 +165,7 @@ export async function listAvailableSlots(consultationType: ConsultationType) {
 
     for (const time of timeSlots) {
       const [hours, minutes] = time.split(":").map(Number);
-      const slot = new Date(date);
-      slot.setHours(hours, minutes, 0, 0);
+      const slot = torontoSlotToUtc(date, hours, minutes);
       if (slot <= now) continue;
       if (occupied.has(slot.toISOString())) continue;
       if (type.durationMinutes === 60 && time === "16:00") continue;
