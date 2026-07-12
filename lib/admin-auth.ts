@@ -7,7 +7,12 @@ export const ADMIN_COOKIE = "acces_canada_admin";
 const maxAgeSeconds = 60 * 60 * 8;
 
 function getSecret() {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "change-this-admin-secret";
+  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "";
+}
+
+export function getAdminConfigurationError() {
+  const missing = ["ADMIN_PASSWORD"].filter((name) => !process.env[name]);
+  return missing.length ? `Configuration administration incomplète: ${missing.join(", ")}.` : null;
 }
 
 function sign(value: string) {
@@ -41,6 +46,7 @@ function decode(value: string) {
 }
 
 export function verifyAdminPassword(password: string) {
+  if (getAdminConfigurationError()) return false;
   const expected = process.env.ADMIN_PASSWORD;
   if (!expected) {
     return false;

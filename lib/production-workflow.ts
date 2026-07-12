@@ -335,5 +335,9 @@ export async function verifyStripeWebhookSignature(rawBody: string, signature: s
   if (!timestamp || !signatures.length) return false;
   const signedPayload = `${timestamp}.${rawBody}`;
   const expected = crypto.createHmac("sha256", stripeWebhookSecret).update(signedPayload).digest("hex");
-  return signatures.some((item) => crypto.timingSafeEqual(Buffer.from(item), Buffer.from(expected)));
+  const expectedBuffer = Buffer.from(expected);
+  return signatures.some((item) => {
+    const signatureBuffer = Buffer.from(item);
+    return signatureBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+  });
 }

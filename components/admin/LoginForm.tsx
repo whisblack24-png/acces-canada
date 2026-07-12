@@ -14,23 +14,28 @@ export function LoginForm() {
     setLoading(true);
     setError("");
 
-    const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ password: formData.get("password") }),
-    });
+    try {
+      const formData = new FormData(event.currentTarget);
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: formData.get("password") }),
+      });
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
 
-    if (!response.ok) {
-      const result = (await response.json()) as { message?: string };
-      setError(result.message || "Connexion impossible.");
+      if (!response.ok) {
+        setError(result.message || `Connexion impossible (erreur ${response.status}).`);
+        return;
+      }
+
+      router.replace("/admin");
+      router.refresh();
+    } catch {
+      setError("Connexion impossible. Vérifiez votre réseau et réessayez.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push("/admin");
-    router.refresh();
   }
 
   return (

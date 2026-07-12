@@ -6,6 +6,12 @@ import { consultationModeLabels, consultationTypes, type ConsultationMode, type 
 import { formatMoney } from "@/lib/format";
 
 type Slot = { value: string; label: string };
+type Confirmation = {
+  status: "checking" | "pending" | "confirmed" | "error";
+  bookingReference?: string;
+  invoiceNumber?: string;
+  startsAt?: string;
+};
 
 const modes: { value: ConsultationMode; icon: typeof Phone }[] = [
   { value: "telephone", icon: Phone },
@@ -32,6 +38,7 @@ export function BookingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [invoiceSessionId, setInvoiceSessionId] = useState("");
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
   const selectedType = consultationTypes[consultationType];
   const selectedSlotLabel = slots.find((slot) => slot.value === selectedSlot)?.label || "Aucun créneau sélectionné";
@@ -39,13 +46,58 @@ export function BookingForm() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("paiement") === "confirme") {
-      setMessage("Paiement confirmé. Votre rendez-vous est en cours de finalisation et vous recevrez votre courriel de confirmation.");
-      setInvoiceSessionId(params.get("session_id") || "");
+      const sessionId = params.get("session_id") || "";
+      setMessage("Paiement confirmé. Vérification de votre rendez-vous en cours…");
+      setInvoiceSessionId(sessionId);
+      setConfirmation({ status: sessionId ? "checking" : "error" });
     }
     if (params.get("paiement") === "annule") {
       setMessage("Paiement annulé. Aucun rendez-vous n'a été créé.");
     }
   }, []);
+
+  useEffect(() => {
+    if (!invoiceSessionId) return;
+    let active = true;
+    let attempt = 0;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    async function checkStatus() {
+      attempt += 1;
+      try {
+        const response = await fetch(`/api/booking/status/${encodeURIComponent(invoiceSessionId)}`, { cache: "no-store" });
+        const result = (await response.json()) as Confirmation & { message?: string };
+        if (!active) return;
+
+        if (response.ok && result.status === "confirmed") {
+          setConfirmation(result);
+          setMessage("Votre rendez-vous et votre facture ont été créés. Le courriel de confirmation est envoyé à l'adresse fournie.");
+          return;
+        }
+        if (!response.ok && result.status !== "pending") {
+          setConfirmation({ status: "error" });
+          setMessage(result.message || "Le paiement est confirmé, mais le rendez-vous ne peut pas encore être vérifié.");
+          return;
+        }
+        if (attempt < 15) {
+          setConfirmation({ status: "pending" });
+          timeout = setTimeout(checkStatus, 2_000);
+        } else {
+          setConfirmation({ status: "pending" });
+          setMessage("Paiement confirmé. Le traitement prend plus de temps que prévu; Stripe le retentera automatiquement.");
+        }
+      } catch {
+        if (active && attempt < 15) timeout = setTimeout(checkStatus, 2_000);
+        else if (active) setConfirmation({ status: "error" });
+      }
+    }
+
+    checkStatus();
+    return () => {
+      active = false;
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [invoiceSessionId]);
 
   useEffect(() => {
     let active = true;
@@ -117,7 +169,35 @@ export function BookingForm() {
         </p>
       </div>
 
-      <div className="grid gap-6 p-5 md:p-7">
+      {confirmation ? (
+        <section className="m-5 border-2 border-gold bg-[#FBF7EA] p-6 text-center md:m-7 md:p-10" aria-live="polite">
+          <CheckCircle2 className="mx-auto h-14 w-14 text-canada" />
+          <p className="mt-5 text-xs font-black uppercase tracking-[0.24em] text-canada">Transaction Stripe acceptée</p>
+          <h3 className="mt-3 font-display text-4xl font-black text-navy">Paiement confirmé</h3>
+          <p className="mx-auto mt-4 max-w-2xl text-sm font-bold leading-7 text-navy/70">{message}</p>
+
+          {confirmation.status === "confirmed" ? (
+            <div className="mx-auto mt-6 grid max-w-xl gap-3 bg-white p-5 text-left text-sm font-bold text-navy/70">
+              <p><span className="text-navy">Numéro de réservation :</span> {confirmation.bookingReference}</p>
+              <p><span className="text-navy">Numéro de facture :</span> {confirmation.invoiceNumber}</p>
+              {confirmation.startsAt ? <p><span className="text-navy">Rendez-vous :</span> {new Date(confirmation.startsAt).toLocaleString("fr-CA")}</p> : null}
+            </div>
+          ) : (
+            <p className="mt-6 font-black text-navy">Finalisation du rendez-vous en cours…</p>
+          )}
+
+          <div className="mt-7 flex flex-wrap justify-center gap-3">
+            {confirmation.status === "confirmed" ? (
+              <a href={`/api/booking/invoice/session/${invoiceSessionId}`} className="bg-canada px-6 py-3 text-sm font-black text-white">
+                Télécharger la facture PDF
+              </a>
+            ) : null}
+            <a href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Retour à l'accueil</a>
+          </div>
+        </section>
+      ) : null}
+
+      <div className={`grid gap-6 p-5 md:p-7 ${confirmation ? "border-t border-navy/10 opacity-60" : ""}`}>
         {message ? (
           <div className="flex items-start gap-3 border border-gold/35 bg-[#FBF7EA] p-4 text-sm font-bold leading-6 text-navy">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-canada" />

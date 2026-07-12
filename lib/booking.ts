@@ -29,6 +29,10 @@ export type AppointmentInput = {
 const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
 const bookingTimeZone = "America/Toronto";
 
+function logBooking(stage: string, sessionId: string, details: Record<string, unknown> = {}) {
+  console.info("[appointment-booking]", JSON.stringify({ stage, sessionId, ...details }));
+}
+
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -313,11 +317,13 @@ export async function confirmAppointmentFromStripeSession(session: {
   metadata?: Record<string, string | undefined> | null;
 }) {
   if (!session.id || session.metadata?.workflow !== "appointment_booking") return null;
+  logBooking("session_received", session.id, { paymentStatus: session.payment_status });
   if (session.payment_status !== "paid") {
     throw new Error(`La session Stripe ${session.id} n'est pas payée.`);
   }
 
   const { url, key, table } = config();
+  logBooking("supabase_lookup_start", session.id, { table });
   const existingResponse = await fetch(`${url}/rest/v1/${table}?stripe_session_id=eq.${encodeURIComponent(session.id)}&select=*&limit=1`, {
     headers: headers(key),
     cache: "no-store",
@@ -325,7 +331,9 @@ export async function confirmAppointmentFromStripeSession(session: {
   if (!existingResponse.ok) await supabaseError("Lecture du rendez-vous Stripe", existingResponse);
   const existing = ((await existingResponse.json()) as Appointment[])[0];
   if (existing) {
+    logBooking("appointment_existing", session.id, { appointmentId: existing.id });
     await sendAppointmentConfirmationEmail(existing);
+    logBooking("email_complete", session.id, { appointmentId: existing.id });
     return existing;
   }
 
@@ -350,9 +358,11 @@ export async function confirmAppointmentFromStripeSession(session: {
   if (((await conflictResponse.json()) as { id: string }[]).length) {
     throw new Error("Ce créneau vient d'être réservé. Une intervention administrative est nécessaire pour replacer le paiement.");
   }
+  logBooking("slot_available", session.id);
 
   const bookingReference = await nextReference("AC-RDV");
   const invoiceNumber = await nextReference("AC-FAC");
+  logBooking("references_created", session.id, { bookingReference, invoiceNumber });
   const appointmentPayload = {
     stripe_session_id: session.id,
     stripe_payment_intent: session.payment_intent || null,
@@ -384,7 +394,9 @@ export async function confirmAppointmentFromStripeSession(session: {
   });
   if (!insertResponse.ok) await supabaseError("Confirmation du rendez-vous", insertResponse);
   const appointment = ((await insertResponse.json()) as Appointment[])[0];
+  logBooking("appointment_inserted", session.id, { appointmentId: appointment.id });
   await sendAppointmentConfirmationEmail(appointment);
+  logBooking("email_complete", session.id, { appointmentId: appointment.id });
   return appointment;
 }
 
@@ -496,7 +508,10 @@ export async function sendAppointmentConfirmationEmail(appointment: Appointment)
     throw new Error("Configuration SMTP invalide: SMTP_PORT doit être un port valide.");
   }
 
+  logBooking("pdf_start", appointment.stripe_session_id, { appointmentId: appointment.id });
   const invoice = generateAppointmentInvoicePdf(appointment);
+  logBooking("pdf_complete", appointment.stripe_session_id, { appointmentId: appointment.id, bytes: invoice.length });
+  logBooking("smtp_start", appointment.stripe_session_id, { appointmentId: appointment.id, host, port });
   await sendSmtpMail({
     host: host!,
     port,
@@ -537,6 +552,7 @@ ${brand.email}`,
       },
     ],
   });
+  logBooking("smtp_accepted", appointment.stripe_session_id, { appointmentId: appointment.id });
 }
 
 export async function cancelAppointment(id: string) {
