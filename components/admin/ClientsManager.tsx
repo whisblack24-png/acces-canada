@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { Edit3, Eye, FileText, Plus, Trash2, X } from "lucide-react";
+import { Edit3, Eye, FileText, Plus, Search, Trash2, X } from "lucide-react";
 import { dossierStatuses, serviceLabels, serviceTypes, statusLabels } from "@/lib/admin-data";
 import type { AdminClient, ClientInput, ClientStatus, ServiceType } from "@/lib/admin-data";
 import { formatMoney } from "@/lib/format";
@@ -42,6 +42,9 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
   const [selected, setSelected] = useState<AdminClient | null>(initialClients[0] || null);
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("");
 
   const stats = useMemo(
     () => ({
@@ -54,6 +57,22 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
     }),
     [clients],
   );
+
+  const filteredClients = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("fr-CA");
+    return clients.filter((client) => {
+      const matchesQuery = !query || [
+        client.full_name,
+        client.email,
+        client.phone,
+        client.country,
+        client.file_reference,
+      ].some((value) => String(value || "").toLocaleLowerCase("fr-CA").includes(query));
+      const matchesStatus = !statusFilter || client.status === statusFilter;
+      const matchesService = !serviceFilter || client.service === serviceFilter;
+      return matchesQuery && matchesStatus && matchesService;
+    });
+  }, [clients, search, statusFilter, serviceFilter]);
 
   function edit(client: AdminClient) {
     setEditingId(client.id);
@@ -142,15 +161,35 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
           </div>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-2xl border border-navy/10">
+        <div className="mt-6 grid gap-3 rounded-2xl bg-ivory p-3 md:grid-cols-[1fr_180px_190px]">
+          <label className="relative">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-navy/35" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Nom, courriel, téléphone ou référence"
+              className="w-full rounded-xl border border-navy/10 bg-white py-3 pl-11 pr-4 text-sm font-bold text-navy outline-none focus:border-gold"
+            />
+          </label>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-xl border border-navy/10 bg-white px-4 py-3 text-sm font-bold text-navy outline-none focus:border-gold">
+            <option value="">Tous les statuts</option>
+            {dossierStatuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}
+          </select>
+          <select value={serviceFilter} onChange={(event) => setServiceFilter(event.target.value)} className="rounded-xl border border-navy/10 bg-white px-4 py-3 text-sm font-bold text-navy outline-none focus:border-gold">
+            <option value="">Tous les services</option>
+            {serviceTypes.map((value) => <option key={value} value={value}>{serviceLabels[value]}</option>)}
+          </select>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border border-navy/10">
           <div className="grid grid-cols-[1.1fr_0.9fr_0.8fr_0.8fr] bg-navy px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-white/70">
             <span>Client</span>
             <span>Service</span>
             <span>Statut</span>
             <span className="text-right">Actions</span>
           </div>
-          {clients.length ? (
-            clients.map((client) => (
+          {filteredClients.length ? (
+            filteredClients.map((client) => (
               <div
                 key={client.id}
                 className="grid grid-cols-1 gap-3 border-t border-navy/10 px-4 py-4 md:grid-cols-[1.1fr_0.9fr_0.8fr_0.8fr] md:items-center"
@@ -179,7 +218,7 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
               </div>
             ))
           ) : (
-            <p className="px-4 py-8 text-center text-sm font-bold text-navy/50">Aucun client enregistré pour le moment.</p>
+            <p className="px-4 py-8 text-center text-sm font-bold text-navy/50">Aucun client ne correspond à ces critères.</p>
           )}
         </div>
       </section>

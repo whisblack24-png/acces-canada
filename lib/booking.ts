@@ -1,6 +1,7 @@
 import { sendSmtpMail } from "@/lib/smtp";
 import { brand } from "@/lib/site";
-import { formatDateFr, formatMoney } from "@/lib/format";
+import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
+import { generatePremiumAppointmentInvoicePdf } from "@/lib/appointment-invoice";
 import {
   consultationModeLabels,
   consultationTypes,
@@ -111,11 +112,11 @@ function normalizeAppointmentInput(input: AppointmentInput) {
   const starts = new Date(input.startsAt);
   if (Number.isNaN(starts.getTime())) throw new Error("Créneau invalide.");
 
-  const firstName = input.firstName.trim();
-  const lastName = input.lastName.trim();
+  const firstName = formatProperName(input.firstName);
+  const lastName = formatProperName(input.lastName);
   const email = input.email.trim().toLowerCase();
-  const phone = input.phone.trim();
-  const country = input.country.trim();
+  const phone = formatPhoneNumber(input.phone);
+  const country = formatCountryName(input.country);
   const reason = input.reason.trim();
   const fullName = `${firstName} ${lastName}`.trim();
 
@@ -434,7 +435,7 @@ function writeObject(parts: string[], index: number, body: string, offsets: numb
   parts.push(`${index} 0 obj\n${body}\nendobj\n`);
 }
 
-export function generateAppointmentInvoicePdf(appointment: Appointment) {
+function generateAppointmentInvoicePdfLegacy(appointment: Appointment) {
   const content: string[] = [];
   let y = 620;
 
@@ -484,6 +485,10 @@ export function generateAppointmentInvoicePdf(appointment: Appointment) {
   }
   parts.push(`trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
   return Buffer.from(parts.join(""), "latin1");
+}
+
+export function generateAppointmentInvoicePdf(appointment: Appointment) {
+  return generatePremiumAppointmentInvoicePdf(appointment);
 }
 
 export async function sendAppointmentConfirmationEmail(appointment: Appointment) {

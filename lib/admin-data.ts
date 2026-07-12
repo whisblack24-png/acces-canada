@@ -11,6 +11,7 @@
   | "en_traitement"
   | "approuve"
   | "refuse";
+import { formatCountryName, formatPhoneNumber, formatProperName } from "@/lib/format";
 export type ServiceType = "visa_visiteur" | "permis_etudes" | "permis_travail" | "residence_permanente" | "autre";
 
 export type ActionHistoryItem = {
@@ -55,7 +56,7 @@ export type ClientInput = {
   paid_amount?: number;
 };
 
-export const dossierStatuses: ClientStatus[] = ["nouveau", "documents_recus", "en_analyse", "en_attente", "depose", "termine"];
+export const dossierStatuses: ClientStatus[] = ["nouveau", "en_analyse", "documents_recus", "soumis", "en_attente", "termine"];
 export const serviceTypes: ServiceType[] = ["visa_visiteur", "permis_etudes", "permis_travail", "residence_permanente", "autre"];
 
 const legacyStatusMap: Record<string, ClientStatus> = {
@@ -75,7 +76,7 @@ const legacyStatusMap: Record<string, ClientStatus> = {
 export const statusLabels: Record<ClientStatus, string> = {
   nouveau: "Nouveau",
   documents_recus: "Documents reçus",
-  en_analyse: "En analyse",
+  en_analyse: "En cours",
   en_attente: "En attente",
   depose: "Déposé",
   termine: "Terminé",
@@ -205,10 +206,10 @@ export function sanitizeClientInput(input: Partial<ClientInput>): ClientInput {
   const service = serviceTypes.includes(rawService as ServiceType) ? rawService : rawService || "autre";
 
   return {
-    full_name: String(input.full_name || "").trim().slice(0, 180),
+    full_name: formatProperName(String(input.full_name || "")).slice(0, 180),
     email: String(input.email || "").trim().toLowerCase().slice(0, 254),
-    phone: String(input.phone || "").trim().slice(0, 80) || undefined,
-    country: String(input.country || "").trim().slice(0, 120) || undefined,
+    phone: formatPhoneNumber(String(input.phone || "")).slice(0, 80) || undefined,
+    country: formatCountryName(String(input.country || "")).slice(0, 120) || undefined,
     service: service.slice(0, 160),
     status,
     file_reference: String(input.file_reference || "").trim().slice(0, 120) || undefined,

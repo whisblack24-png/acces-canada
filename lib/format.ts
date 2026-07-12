@@ -20,3 +20,27 @@ export function formatMoney(value: number | null | undefined) {
     maximumFractionDigits: 2,
   })} $`;
 }
+
+export function formatProperName(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("fr-CA")
+    .replace(/(^|[\s'-])([\p{L}])/gu, (_match, separator: string, letter: string) => `${separator}${letter.toLocaleUpperCase("fr-CA")}`);
+}
+
+export function formatCountryName(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized.toLocaleLowerCase("fr-CA") === "canada" ? "Canada" : formatProperName(normalized);
+}
+
+export function formatPhoneNumber(value: string) {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  const northAmerican = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+  if (northAmerican.length === 10) {
+    return `+1 ${northAmerican.slice(0, 3)}-${northAmerican.slice(3, 6)}-${northAmerican.slice(6)}`;
+  }
+  if (trimmed.startsWith("+") && digits.length >= 8) return `+${digits}`;
+  return trimmed;
+}
