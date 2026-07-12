@@ -515,8 +515,8 @@ export async function sendAppointmentConfirmationEmail(appointment: Appointment)
   await sendSmtpMail({
     host: host!,
     port,
-    secure: String(process.env.SMTP_SECURE || "true") === "true",
-    startTls: String(process.env.SMTP_STARTTLS || "false") === "true",
+    secure: process.env.SMTP_SECURE === "true" || (process.env.SMTP_SECURE == null && port === 465),
+    startTls: port !== 465 && process.env.SMTP_STARTTLS !== "false",
     user: user!,
     pass: pass!,
     from: from!,

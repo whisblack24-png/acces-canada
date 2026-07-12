@@ -180,26 +180,42 @@ async function authenticate(socket: net.Socket, user: string, pass: string) {
 
 export async function sendSmtpMail(options: SmtpOptions) {
   let socket: net.Socket | tls.TLSSocket | undefined;
+  const normalizedPass = options.host.toLowerCase() === "smtp.gmail.com" ? options.pass.replace(/\s/g, "") : options.pass;
+  const context = { host: options.host, port: options.port, secure: options.secure, recipient: encodeAddress(options.to) };
   try {
+    console.info("[smtp] connect_start", context);
     socket = options.secure ? await connectTls(options.host, options.port) : await connectPlain(options.host, options.port);
     await waitForLine(socket);
+    console.info("[smtp] connected", context);
     await command(socket, "EHLO acces-canada.vercel.app", [250]);
     if (!options.secure && options.startTls !== false) {
+      console.info("[smtp] starttls_start", context);
       await command(socket, "STARTTLS", [220]);
       socket = await upgradeToTls(socket, options.host);
       await command(socket, "EHLO acces-canada.vercel.app", [250]);
+      console.info("[smtp] starttls_complete", context);
     }
 
-    await authenticate(socket, options.user, options.pass);
+    if (normalizedPass !== options.pass) console.info("[smtp] gmail_app_password_whitespace_removed");
+    await authenticate(socket, options.user, normalizedPass);
+    console.info("[smtp] authenticated", context);
     await command(socket, `MAIL FROM:<${encodeAddress(options.from)}>`, [250]);
     await command(socket, `RCPT TO:<${encodeAddress(options.to)}>`, [250, 251]);
+    console.info("[smtp] envelope_accepted", context);
     await command(socket, "DATA", [354]);
     socket.write(`${formatMessage(options)}\r\n.\r\n`);
     const response = await waitForLine(socket);
     const code = Number(response.slice(0, 3));
     if (code !== 250) throw new Error(`Le serveur SMTP a refusé le message: ${response.trim()}`);
-    console.info("[smtp] Message accepté par le serveur.", { recipient: encodeAddress(options.to), response: response.trim() });
+    console.info("[smtp] message_accepted", { ...context, response: response.trim() });
     await command(socket, "QUIT", [221]);
+  } catch (error) {
+    console.error("[smtp] failed", {
+      ...context,
+      message: error instanceof Error ? error.message : "Erreur inconnue",
+      code: error && typeof error === "object" && "code" in error ? String(error.code) : undefined,
+    });
+    throw error;
   } finally {
     socket?.destroy();
   }
