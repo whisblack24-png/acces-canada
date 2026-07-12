@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
-import type { Appointment } from "@/lib/booking-shared";
-import { consultationModeLabels, consultationTypes, formatDateTimeFr } from "@/lib/booking-shared";
-import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
-import { brand } from "@/lib/site";
+import type { Appointment } from "./booking-shared";
+import { consultationModeLabels, consultationTypes, formatDateTimeFr } from "./booking-shared";
+import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "./format";
+import { brand } from "./site";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -135,7 +135,7 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   const clientName = formatProperName(appointment.client_full_name);
   const phone = formatPhoneNumber(appointment.client_phone);
   const country = formatCountryName(appointment.client_country);
-  const amount = `${formatMoney(appointment.amount_cents / 100)} USD`;
+  const amount = `${formatMoney(appointment.amount_cents / 100)} US`;
   const transaction = appointment.stripe_payment_intent || appointment.stripe_session_id;
   const compactTransaction = transaction.length > 34 ? `${transaction.slice(0, 18)}…${transaction.slice(-10)}` : transaction;
   const content: string[] = [];
