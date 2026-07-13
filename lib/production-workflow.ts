@@ -326,22 +326,6 @@ Accès Canada`,
   return updated;
 }
 
-export async function verifyStripeWebhookSignature(rawBody: string, signature: string | null) {
-  const { stripeWebhookSecret } = config();
-  if (!stripeWebhookSecret || !signature) return false;
-  const crypto = await import("node:crypto");
-  const timestamp = signature.match(/t=([^,]+)/)?.[1];
-  const signatures = [...signature.matchAll(/v1=([^,]+)/g)].map((match) => match[1]);
-  if (!timestamp || !signatures.length) return false;
-  const signedPayload = `${timestamp}.${rawBody}`;
-  const expected = crypto.createHmac("sha256", stripeWebhookSecret).update(signedPayload).digest("hex");
-  const expectedBuffer = Buffer.from(expected);
-  return signatures.some((item) => {
-    const signatureBuffer = Buffer.from(item);
-    return signatureBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
-  });
-}
-
 export async function listAllClientPayments() {
   const { url, key, paymentsTable } = config();
   const response = await fetch(`${url}/rest/v1/${paymentsTable}?select=*&order=created_at.desc`, {

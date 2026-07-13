@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { confirmAppointmentFromStripeSession } from "@/lib/booking";
-import { markPaymentPaid, verifyStripeWebhookSignature } from "@/lib/production-workflow";
+import { markPaymentPaid } from "@/lib/production-workflow";
+import { stripeEventMatchesConfiguredMode, verifyStripeWebhookSignature } from "@/lib/stripe-webhook";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
     const event = JSON.parse(rawBody) as {
       id?: string;
       type?: string;
+      livemode?: boolean;
       data?: {
         object?: {
           id?: string;
@@ -37,6 +39,16 @@ export async function POST(request: Request) {
 
     const sessionId = event.data?.object?.id || null;
     logWebhook("signature_valid", { eventId: event.id, eventType: event.type, sessionId });
+
+    if (!stripeEventMatchesConfiguredMode(event.livemode)) {
+      console.error("[stripe-webhook]", JSON.stringify({
+        stage: "mode_mismatch",
+        eventId: event.id,
+        eventType: event.type,
+        livemode: event.livemode,
+      }));
+      return NextResponse.json({ received: false, stage: "mode", message: "Mode Stripe incohérent." }, { status: 400 });
+    }
 
     if (event.type === "checkout.session.completed" && event.data?.object?.id) {
       if (event.data.object.metadata?.workflow === "appointment_booking") {
