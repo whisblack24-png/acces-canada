@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
-import { stripeEventMatchesConfiguredMode, verifyStripeWebhookSignature } from "../lib/stripe-webhook.ts";
+import { assertStripeKeyForEnvironment, stripeEventMatchesConfiguredMode, verifyStripeWebhookSignature } from "../lib/stripe-webhook.ts";
 
 function signature(body: string, timestamp: number, secret: string) {
   const digest = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
@@ -26,4 +26,13 @@ test("le mode de l'événement doit correspondre à la clé Stripe", () => {
   assert.equal(stripeEventMatchesConfiguredMode(true, "sk_live_example"), true);
   assert.equal(stripeEventMatchesConfiguredMode(true, "sk_test_example"), false);
   assert.equal(stripeEventMatchesConfiguredMode(false, "sk_live_example"), false);
+});
+
+test("la production refuse toute clé Stripe Test", () => {
+  assert.equal(assertStripeKeyForEnvironment("sk_live_example", "production"), "live");
+  assert.equal(assertStripeKeyForEnvironment("sk_test_example", "preview"), "test");
+  assert.throws(
+    () => assertStripeKeyForEnvironment("sk_test_example", "production"),
+    /refuse de créer une session Stripe avec une clé Test/,
+  );
 });

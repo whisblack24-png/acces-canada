@@ -2,6 +2,7 @@ import { getClient, updateClient, type AdminClient, type ClientInput } from "@/l
 import { documentLabels, type ClientDocumentType } from "@/lib/pdf-documents";
 import { sendSmtpMail } from "@/lib/smtp";
 import { formatMoney } from "@/lib/format";
+import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
 
 export type SignatureStatus = "pending" | "signed" | "declined";
 export type PaymentStatus = "pending" | "paid" | "failed" | "cancelled";
@@ -236,6 +237,7 @@ export async function listClientPayments(clientId: string) {
 export async function createPaymentCheckout(client: AdminClient, amountCents: number, description: string) {
   const { url, key, paymentsTable, stripeSecretKey, siteUrl } = config();
   if (!stripeSecretKey) throw new Error("STRIPE_SECRET_KEY est manquant.");
+  assertStripeKeyForEnvironment(stripeSecretKey);
 
   const params = new URLSearchParams();
   params.set("mode", "payment");

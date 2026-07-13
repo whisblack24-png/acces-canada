@@ -32,3 +32,20 @@ export function stripeEventMatchesConfiguredMode(
   if (livemode == null || (!stripeSecretKey.startsWith("sk_live_") && !stripeSecretKey.startsWith("sk_test_"))) return false;
   return livemode === stripeSecretKey.startsWith("sk_live_");
 }
+
+export function assertStripeKeyForEnvironment(
+  stripeSecretKey: string,
+  vercelEnvironment = process.env.VERCEL_ENV,
+) {
+  const mode = stripeSecretKey.startsWith("sk_live_")
+    ? "live"
+    : stripeSecretKey.startsWith("sk_test_")
+      ? "test"
+      : null;
+
+  if (!mode) throw new Error("STRIPE_SECRET_KEY n'est pas une clé Stripe secrète valide.");
+  if (vercelEnvironment === "production" && mode !== "live") {
+    throw new Error("La production refuse de créer une session Stripe avec une clé Test.");
+  }
+  return mode;
+}

@@ -6,6 +6,7 @@ import { brand } from "@/lib/site";
 import { appointmentConfirmationEmailHtml } from "@/lib/appointment-confirmation-email";
 import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
 import { generatePremiumAppointmentInvoicePdf } from "@/lib/appointment-invoice";
+import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
 import {
   consultationModeLabels,
   consultationTypes,
@@ -272,7 +273,9 @@ async function nextReference(prefix: "AC-RDV" | "AC-FAC") {
 export async function createAppointmentCheckout(input: AppointmentInput) {
   const { stripeSecretKey, siteUrl } = config();
   if (!stripeSecretKey) throw new Error("STRIPE_SECRET_KEY est manquant.");
+  const stripeMode = assertStripeKeyForEnvironment(stripeSecretKey);
   const normalized = normalizeAppointmentInput(input);
+  logBooking("checkout_create_start", "pending", { stripeMode, vercelEnvironment: process.env.VERCEL_ENV || "local" });
 
   const params = new URLSearchParams();
   params.set("mode", "payment");
@@ -310,6 +313,8 @@ export async function createAppointmentCheckout(input: AppointmentInput) {
   if (!stripeResponse.ok || !stripeSession.id || !stripeSession.url) {
     throw new Error(stripeSession.error?.message || "Création de session Stripe impossible.");
   }
+
+  logBooking("checkout_create_complete", stripeSession.id, { stripeMode });
 
   return { checkoutUrl: stripeSession.url };
 }
