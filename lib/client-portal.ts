@@ -343,6 +343,15 @@ export async function listClientMessages(clientId: string) {
   return (await response.json()) as ClientMessage[];
 }
 
+export async function listAllClientMessages() {
+  const { url, key, messagesTable } = config();
+  const response = await fetch(`${url}/rest/v1/${messagesTable}?select=*&order=created_at.desc`, {
+    headers: headers(key), cache: "no-store",
+  });
+  if (!response.ok) await fail("Liste globale des messages", response);
+  return (await response.json()) as ClientMessage[];
+}
+
 export async function createClientMessage(clientId: string, sender: "client" | "admin", body: string) {
   const { url, key, messagesTable } = config();
   const cleanBody = body.trim().slice(0, 4000);

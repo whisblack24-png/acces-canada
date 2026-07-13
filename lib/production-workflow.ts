@@ -341,3 +341,12 @@ export async function verifyStripeWebhookSignature(rawBody: string, signature: s
     return signatureBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
   });
 }
+
+export async function listAllClientPayments() {
+  const { url, key, paymentsTable } = config();
+  const response = await fetch(`${url}/rest/v1/${paymentsTable}?select=*&order=created_at.desc`, {
+    headers: headers(key), cache: "no-store",
+  });
+  if (!response.ok) await supabaseError("Liste globale paiements", response);
+  return (await response.json()) as ClientPayment[];
+}
