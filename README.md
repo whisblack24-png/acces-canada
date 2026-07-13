@@ -30,7 +30,7 @@ Then open `http://localhost:3000`.
 ## Assets
 
 - Logo: `public/images/logo.png`
-- Skyline hero: `public/images/canada-skyline.png`
+- Skyline hero optimisée: `public/images/canada-skyline.webp`
 
 ## Production Vercel
 

@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <main className="bg-white">
       <section className="relative min-h-screen overflow-hidden">
-        <Image src="/images/canada-skyline.png" alt="Toronto" fill priority className="object-cover" />
+        <Image src="/images/canada-skyline.webp" alt="Panorama urbain canadien" fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-32 text-center">
           <Image src="/images/logo.png" alt="Accès Canada" width={140} height={140} className="mb-8 rounded-3xl" />

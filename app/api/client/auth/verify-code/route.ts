@@ -1,11 +1,14 @@
 ﻿import { NextResponse } from "next/server";
 import { setClientSession } from "@/lib/client-auth";
 import { verifyLoginCode } from "@/lib/client-portal";
+import { checkRateLimit, requestIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    const rate = checkRateLimit(`client-verify:${requestIp(request)}`, 10, 15 * 60 * 1000);
+    if (!rate.allowed) return NextResponse.json({ message: "Trop de tentatives. Demandez un nouveau code plus tard." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
     const { email, code } = (await request.json()) as { email?: string; code?: string };
     const cleanEmail = String(email || "").trim().toLowerCase();
     const cleanCode = String(code || "").trim();

@@ -25,7 +25,7 @@ function safeEqual(a: string, b: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function useSecureCookie() {
+function shouldUseSecureCookie() {
   if (process.env.ADMIN_COOKIE_SECURE === "false") {
     return false;
   }
@@ -112,7 +112,7 @@ export function setAdminSession(response: NextResponse) {
   response.cookies.set(ADMIN_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: useSecureCookie(),
+    secure: shouldUseSecureCookie(),
     path: "/admin",
     maxAge: 0,
     expires: new Date(0),
@@ -121,7 +121,7 @@ export function setAdminSession(response: NextResponse) {
   response.cookies.set(ADMIN_COOKIE, createAdminSessionValue(), {
     httpOnly: true,
     sameSite: "lax",
-    secure: useSecureCookie(),
+    secure: shouldUseSecureCookie(),
     path: "/",
     maxAge: maxAgeSeconds,
   });
@@ -133,7 +133,7 @@ export function clearAdminSession(response: NextResponse) {
     response.cookies.set(ADMIN_COOKIE, "", {
       httpOnly: true,
       sameSite: "lax",
-      secure: useSecureCookie(),
+      secure: shouldUseSecureCookie(),
       path,
       maxAge: 0,
       expires: new Date(0),

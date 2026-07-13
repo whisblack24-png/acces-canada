@@ -5,7 +5,7 @@ import { SectionTitle } from "@/components/SectionTitle";
 import { process, values } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "About",
+  title: "À propos",
   description: "Découvrez Accès Canada, cabinet de conseil premium pour vos projets d'études, de travail et d'installation au Canada."
 };
 
@@ -13,7 +13,7 @@ export default function AboutPage() {
   return (
     <main>
       <InteriorHero
-        eyebrow="About"
+        eyebrow="À propos"
         title="Un partenaire de confiance pour votre avenir au Canada."
         text="Accès Canada accompagne les projets de mobilité avec une méthode claire, une écoute sérieuse et une approche résolument professionnelle."
       />

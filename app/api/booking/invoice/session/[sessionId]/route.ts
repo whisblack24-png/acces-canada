@@ -25,6 +25,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${appointment.invoice_number}.pdf"`,
+      "Cache-Control": "private, no-store",
+      "X-Robots-Tag": "noindex, nofollow",
     },
   });
 }

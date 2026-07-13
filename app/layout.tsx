@@ -3,7 +3,7 @@ import "./globals.css";
 import { SiteChrome } from "@/components/SiteChrome";
 import { brand } from "@/lib/site";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://acces-canada.com";
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || "https://acces-canada.vercel.app").replace(/\/$/, "");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -23,12 +23,13 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: brand.name }],
   creator: brand.name,
+  category: "services professionnels",
   openGraph: {
     title: "Accès Canada",
     description: brand.slogan,
     url: siteUrl,
     siteName: "Accès Canada",
-    images: [{ url: "/images/canada-skyline.png", width: 1200, height: 630, alt: "Canada skyline" }],
+    images: [{ url: "/images/canada-skyline.webp", width: 1200, height: 630, alt: "Accès Canada - accompagnement professionnel" }],
     locale: "fr_CA",
     type: "website"
   },
@@ -36,12 +37,14 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Accès Canada",
     description: brand.slogan,
-    images: ["/images/canada-skyline.png"]
+    images: ["/images/canada-skyline.webp"]
   },
   icons: {
     icon: "/images/logo.png",
     apple: "/images/logo.png"
-  }
+  },
+  manifest: "/manifest.webmanifest",
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {

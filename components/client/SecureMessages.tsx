@@ -30,8 +30,9 @@ export function SecureMessages({ initialMessages, adminClientId }: { initialMess
       </div>) : <p className="py-8 text-center text-sm font-bold text-navy/45">Aucun message pour le moment.</p>}
     </div>
     <form onSubmit={submit} className="space-y-3">
-      <textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={4000} required rows={4} placeholder="Écrivez votre message sécurisé…" className="w-full rounded-2xl border border-navy/10 bg-white px-4 py-3 text-navy outline-none focus:border-gold" />
-      {feedback ? <p className="text-sm font-bold text-navy/60">{feedback}</p> : null}
+      <label htmlFor="secure-message" className="block text-sm font-black text-navy">Nouveau message sécurisé</label>
+      <textarea id="secure-message" value={body} onChange={(event) => setBody(event.target.value)} maxLength={4000} required rows={4} placeholder="Écrivez votre message sécurisé…" className="w-full rounded-2xl border border-navy/10 bg-white px-4 py-3 text-navy outline-none focus:border-gold" />
+      {feedback ? <p role="status" aria-live="polite" className="text-sm font-bold text-navy/60">{feedback}</p> : null}
       <button disabled={loading} className="inline-flex items-center gap-2 rounded-full bg-gold px-5 py-3 text-sm font-black text-navy disabled:opacity-50"><Send className="h-4 w-4" />{loading ? "Envoi…" : "Envoyer"}</button>
     </form>
   </div>;

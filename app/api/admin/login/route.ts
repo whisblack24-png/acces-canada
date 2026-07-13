@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAdminConfigurationError, setAdminSession, verifyAdminPassword } from "@/lib/admin-auth";
+import { checkRateLimit, requestIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
+    const rate = checkRateLimit(`admin-login:${requestIp(request)}`, 8, 15 * 60 * 1000);
+    if (!rate.allowed) return NextResponse.json({ message: "Trop de tentatives. Réessayez dans quelques minutes." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
     const configurationError = getAdminConfigurationError();
     if (configurationError) {
       console.error("[admin-login]", configurationError);

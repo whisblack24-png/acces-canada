@@ -9,7 +9,7 @@ type InteriorHeroProps = {
 export function InteriorHero({ eyebrow, title, text }: InteriorHeroProps) {
   return (
     <section className="relative overflow-hidden bg-navy px-6 pb-20 pt-36 text-white">
-      <Image src="/images/canada-skyline.png" alt="Canada skyline" fill className="object-cover opacity-24" sizes="100vw" />
+      <Image src="/images/canada-skyline.webp" alt="" fill className="object-cover opacity-24" sizes="100vw" />
       <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/88 to-navy/54" />
       <div className="absolute inset-0 premium-grid opacity-15" />
       <div className="relative mx-auto max-w-7xl">

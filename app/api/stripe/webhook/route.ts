@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       stack: error instanceof Error ? error.stack : undefined,
     }));
     return NextResponse.json(
-      { received: false, stage: "processing", message: "Webhook Stripe non traité.", details: message },
+      { received: false, stage: "processing", message: "Webhook Stripe non traité." },
       { status: 500 },
     );
   }

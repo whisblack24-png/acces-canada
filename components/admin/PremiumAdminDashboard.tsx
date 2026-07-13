@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Clock3, FileCheck2, FilePlus2, FileText, FolderClock, MessageSquare, Plus, Search, TrendingUp, UserPlus, UsersRound } from "lucide-react";
+import { BarChart3, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Clock3, FileCheck2, FilePlus2, FileText, FolderClock, MessageSquare, Plus, Search, TrendingUp, UserPlus } from "lucide-react";
 import type { buildAdminDashboard } from "@/lib/admin-dashboard";
 import { formatMoney } from "@/lib/format";
 

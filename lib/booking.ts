@@ -439,6 +439,8 @@ function writeObject(parts: string[], index: number, body: string, offsets: numb
   parts.push(`${index} 0 obj\n${body}\nendobj\n`);
 }
 
+// Conservée temporairement pour comparer le rendu historique lors des régressions PDF.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generateAppointmentInvoicePdfLegacy(appointment: Appointment) {
   const content: string[] = [];
   let y = 620;

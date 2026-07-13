@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, Loader2, LogIn, Phone, Sparkles, Video, UsersRound } from "lucide-react";
 import { consultationModeLabels, consultationTypes, type ConsultationMode, type ConsultationType } from "@/lib/booking-shared";
 import { formatMoney } from "@/lib/format";
@@ -205,17 +206,17 @@ export function BookingForm() {
                 Télécharger la facture PDF
               </a>
             ) : null}
-            <a href="/client/login" className="inline-flex items-center gap-2 bg-gold px-6 py-3 text-sm font-black text-navy">
+            <Link href="/client/login" className="inline-flex items-center gap-2 bg-gold px-6 py-3 text-sm font-black text-navy">
               <LogIn className="h-4 w-4" /> Accéder à mon espace client
-            </a>
-            <a href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Retour à l'accueil</a>
+            </Link>
+            <Link href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Retour à l'accueil</Link>
           </div>
         </section>
       ) : null}
 
       <div className={`grid gap-6 p-5 md:p-7 ${confirmation ? "border-t border-navy/10 opacity-60" : ""}`}>
         {message ? (
-          <div className="flex items-start gap-3 border border-gold/35 bg-[#FBF7EA] p-4 text-sm font-bold leading-6 text-navy">
+          <div role="status" aria-live="polite" className="flex items-start gap-3 border border-gold/35 bg-[#FBF7EA] p-4 text-sm font-bold leading-6 text-navy">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-canada" />
             <span>{message}</span>
             {invoiceSessionId ? (
@@ -251,8 +252,9 @@ export function BookingForm() {
         </section>
 
         <section>
-          <p className="text-sm font-black text-navy">Date et heure disponibles</p>
+          <label htmlFor="booking-slot" className="text-sm font-black text-navy">Date et heure disponibles</label>
           <select
+            id="booking-slot"
             value={selectedSlot}
             onChange={(event) => setSelectedSlot(event.target.value)}
             className="mt-3 w-full border border-navy/15 bg-white px-4 py-3 text-sm font-bold text-navy outline-none focus:border-gold"

@@ -6,7 +6,9 @@ export const CLIENT_COOKIE = "acces_canada_client";
 const maxAgeSeconds = 60 * 60 * 6;
 
 function secret() {
-  return process.env.CLIENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || "change-this-client-secret";
+  const value = process.env.CLIENT_SESSION_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD;
+  if (!value) throw new Error("Configuration de session client manquante.");
+  return value;
 }
 
 function sign(value: string) {

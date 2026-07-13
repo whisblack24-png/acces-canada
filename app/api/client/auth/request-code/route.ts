@@ -3,6 +3,7 @@ import { createClientCode } from "@/lib/client-auth";
 import { createLoginCode, findClientByEmail } from "@/lib/client-portal";
 import { sendSmtpMail } from "@/lib/smtp";
 import { brand } from "@/lib/site";
+import { checkRateLimit, requestIp } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -51,6 +52,8 @@ function canShowDevCode() {
 
 export async function POST(request: Request) {
   try {
+    const rate = checkRateLimit(`client-code:${requestIp(request)}`, 5, 15 * 60 * 1000);
+    if (!rate.allowed) return NextResponse.json({ message: "Trop de demandes. Réessayez dans quelques minutes." }, { status: 429, headers: { "Retry-After": String(rate.retryAfter) } });
     const { email } = (await request.json()) as { email?: string };
     const cleanEmail = String(email || "").trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
@@ -59,7 +62,7 @@ export async function POST(request: Request) {
 
     const client = await findClientByEmail(cleanEmail);
     if (!client) {
-      return NextResponse.json({ message: "Aucun dossier client n'est associe a ce courriel." }, { status: 404 });
+      return NextResponse.json({ message: "Si un dossier correspond à cette adresse, un code d’accès vient d’être envoyé." });
     }
 
     const code = createClientCode();
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ message: "Un code d'acces vient d'etre envoye a votre courriel." });
+    return NextResponse.json({ message: "Si un dossier correspond à cette adresse, un code d’accès vient d’être envoyé." });
   } catch (error) {
     console.error("Erreur demande code client:", error);
     const message = error instanceof Error ? error.message : "";

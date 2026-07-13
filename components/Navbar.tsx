@@ -68,7 +68,9 @@ export function Navbar() {
           type="button"
           onClick={() => setOpen((value) => !value)}
           className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white lg:hidden"
-          aria-label="Ouvrir le menu"
+          aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-expanded={open}
+          aria-controls="navigation-mobile"
         >
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -77,6 +79,7 @@ export function Navbar() {
       <AnimatePresence>
         {open ? (
           <motion.div
+            id="navigation-mobile"
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
