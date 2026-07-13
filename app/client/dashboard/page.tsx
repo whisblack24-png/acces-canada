@@ -5,10 +5,11 @@ import { Bell, CalendarDays, CheckCircle2, CreditCard, FileSignature, FileText, 
 import { ClientPanel, ClientShell } from "@/components/client/ClientShell";
 import { ClientUploadForm } from "@/components/client/ClientUploadForm";
 import { ClientPaymentPanel, ClientSignaturePanel } from "@/components/client/ClientProductionActions";
+import { SecureMessages } from "@/components/client/SecureMessages";
 import { getClientSession } from "@/lib/client-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
 import { listGeneratedDocumentsForClient } from "@/lib/admin-documents";
-import { listClientUploads } from "@/lib/client-portal";
+import { listClientMessages, listClientUploads } from "@/lib/client-portal";
 import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
 import { formatDateTimeFr, listAppointmentsForEmail } from "@/lib/booking";
@@ -25,12 +26,13 @@ export default async function ClientDashboardPage() {
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) redirect("/client/login");
 
-  const [uploads, documents, signatures, payments, appointments] = await Promise.all([
+  const [uploads, documents, signatures, payments, appointments, messages] = await Promise.all([
     listClientUploads(client.id).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
     listClientSignatures(client.id).catch(() => []),
     listClientPayments(client.id).catch(() => []),
     listAppointmentsForEmail(client.email).catch(() => []),
+    listClientMessages(client.id).catch(() => []),
   ]);
   const progress = dossierProgress(client.status);
   const upcomingAppointments = appointments.filter((appointment) => appointment.status === "confirmed" && new Date(appointment.starts_at) >= new Date());
@@ -57,7 +59,7 @@ export default async function ClientDashboardPage() {
           <div className="flex items-center justify-between text-sm font-black text-navy"><span>{progress.label}</span><span>{progress.value} %</span></div>
           <div className="mt-3 h-3 overflow-hidden rounded-full bg-navy/8"><div className="h-full rounded-full bg-gradient-to-r from-canada via-gold to-navy" style={{ width: `${progress.value}%` }} /></div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-navy/42 sm:grid-cols-6">
-            {["Nouveau", "En cours", "Documents", "Soumis", "Attente", "Terminé"].map((step) => <span key={step}>{step}</span>)}
+            {["Documents reçus", "Analyse", "Préparation", "Dépôt", "Décision", "Terminé"].map((step) => <span key={step}>{step}</span>)}
           </div>
         </ClientPanel>
 
@@ -133,6 +135,10 @@ export default async function ClientDashboardPage() {
           </div>
         </ClientPanel>
 
+        <ClientPanel title="Messagerie sécurisée" icon={<Bell className="h-5 w-5" />}>
+          <SecureMessages initialMessages={messages} />
+        </ClientPanel>
+
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <ClientPanel title="Dépôt rapide" icon={<UploadCloud className="h-5 w-5" />}>
             <ClientUploadForm initialUploads={uploads.slice(0, 5)} />
@@ -167,12 +173,13 @@ export default async function ClientDashboardPage() {
 
 function dossierProgress(status: string) {
   const values: Record<string, { value: number; label: string }> = {
-    nouveau: { value: 10, label: "Dossier créé" },
-    en_analyse: { value: 30, label: "Analyse en cours" },
-    documents_recus: { value: 50, label: "Documents reçus" },
-    depose: { value: 70, label: "Dossier soumis" },
-    soumis: { value: 70, label: "Dossier soumis" },
-    en_attente: { value: 85, label: "En attente de décision" },
+    nouveau: { value: 8, label: "Dossier créé" },
+    documents_recus: { value: 17, label: "Documents reçus" },
+    en_analyse: { value: 34, label: "Analyse en cours" },
+    en_preparation: { value: 50, label: "Préparation du dossier" },
+    depose: { value: 67, label: "Dossier déposé" },
+    soumis: { value: 67, label: "Dossier déposé" },
+    en_attente: { value: 84, label: "Décision en attente" },
     termine: { value: 100, label: "Dossier terminé" },
     approuve: { value: 100, label: "Dossier approuvé" },
     refuse: { value: 100, label: "Décision reçue" },

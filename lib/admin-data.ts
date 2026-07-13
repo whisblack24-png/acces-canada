@@ -56,7 +56,7 @@ export type ClientInput = {
   paid_amount?: number;
 };
 
-export const dossierStatuses: ClientStatus[] = ["nouveau", "en_analyse", "documents_recus", "soumis", "en_attente", "termine"];
+export const dossierStatuses: ClientStatus[] = ["nouveau", "documents_recus", "en_analyse", "en_preparation", "depose", "en_attente", "termine"];
 export const serviceTypes: ServiceType[] = ["visa_visiteur", "permis_etudes", "permis_travail", "residence_permanente", "autre"];
 
 const legacyStatusMap: Record<string, ClientStatus> = {

@@ -9,6 +9,20 @@ export type ClientUploadedDocument = {
   file_path: string;
   file_type: string | null;
   file_size: number | null;
+  category: string;
+  version: number;
+  status: "active" | "replaced" | "deleted";
+  replaced_document_id: string | null;
+  deleted_at: string | null;
+};
+
+export type ClientMessage = {
+  id: string;
+  created_at: string;
+  client_id: string;
+  sender: "client" | "admin";
+  body: string;
+  read_at: string | null;
 };
 
 const clientDocumentMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
@@ -25,6 +39,7 @@ function config() {
     codesTable: process.env.SUPABASE_CLIENT_LOGIN_CODES_TABLE || "client_login_codes",
     uploadsTable: process.env.SUPABASE_CLIENT_UPLOADS_TABLE || "client_uploaded_documents",
     generatedTable: process.env.SUPABASE_DOCUMENTS_TABLE || "admin_generated_documents",
+    messagesTable: process.env.SUPABASE_CLIENT_MESSAGES_TABLE || "client_messages",
     bucket: process.env.SUPABASE_CLIENT_DOCUMENTS_BUCKET || "client-documents",
   };
 }
@@ -159,10 +174,10 @@ export async function verifyLoginCode(email: string, code: string) {
   return { clientId: row.client_id, email: row.email };
 }
 
-export async function listClientUploads(clientId: string) {
+export async function listClientUploads(clientId: string, includeHistory = false) {
   const { url, key, uploadsTable } = config();
   const response = await fetch(
-    `${url}/rest/v1/${uploadsTable}?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=created_at.desc`,
+    `${url}/rest/v1/${uploadsTable}?client_id=eq.${encodeURIComponent(clientId)}${includeHistory ? "" : "&status=eq.active"}&select=*&order=created_at.desc`,
     { headers: headers(key), cache: "no-store" },
   );
   if (!response.ok) await fail("Liste documents client", response);
@@ -179,7 +194,7 @@ export async function listAllClientUploads() {
   return (await response.json()) as ClientUploadedDocument[];
 }
 
-export async function createClientUpload(record: Omit<ClientUploadedDocument, "id" | "created_at">) {
+export async function createClientUpload(record: Omit<ClientUploadedDocument, "id" | "created_at" | "deleted_at">) {
   const { url, key, uploadsTable } = config();
   const response = await fetch(`${url}/rest/v1/${uploadsTable}`, {
     method: "POST",
@@ -278,10 +293,65 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
   }
 
   const deleteResponse = await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}`, {
-    method: "DELETE",
-    headers: headers(key),
+    method: "PATCH",
+    headers: { ...headers(key), Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "deleted", deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
   });
   if (!deleteResponse.ok) await fail("Suppression de la référence du document client", deleteResponse);
 
   return record;
+}
+
+export async function replaceClientFile(clientId: string, previousId: string, file: File, category: string) {
+  const { url, key, uploadsTable } = config();
+  const previousResponse = await fetch(
+    `${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(previousId)}&client_id=eq.${encodeURIComponent(clientId)}&status=eq.active&select=*&limit=1`,
+    { headers: headers(key), cache: "no-store" },
+  );
+  if (!previousResponse.ok) await fail("Lecture du document à remplacer", previousResponse);
+  const previous = ((await previousResponse.json()) as ClientUploadedDocument[])[0];
+  if (!previous) throw new Error("Document à remplacer introuvable.");
+
+  const filePath = await uploadClientFile(clientId, file);
+  const replacement = await createClientUpload({
+    client_id: clientId,
+    file_name: file.name,
+    file_path: filePath,
+    file_type: file.type,
+    file_size: file.size,
+    category: category || previous.category || "autre",
+    version: Number(previous.version || 1) + 1,
+    status: "active",
+    replaced_document_id: previous.id,
+  });
+  const patch = await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(previous.id)}`, {
+    method: "PATCH",
+    headers: { ...headers(key), Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "replaced", updated_at: new Date().toISOString() }),
+  });
+  if (!patch.ok) await fail("Archivage de l’ancienne version", patch);
+  return replacement;
+}
+
+export async function listClientMessages(clientId: string) {
+  const { url, key, messagesTable } = config();
+  const response = await fetch(
+    `${url}/rest/v1/${messagesTable}?client_id=eq.${encodeURIComponent(clientId)}&select=*&order=created_at.asc`,
+    { headers: headers(key), cache: "no-store" },
+  );
+  if (!response.ok) await fail("Liste des messages", response);
+  return (await response.json()) as ClientMessage[];
+}
+
+export async function createClientMessage(clientId: string, sender: "client" | "admin", body: string) {
+  const { url, key, messagesTable } = config();
+  const cleanBody = body.trim().slice(0, 4000);
+  if (!cleanBody) throw new Error("Le message est vide.");
+  const response = await fetch(`${url}/rest/v1/${messagesTable}`, {
+    method: "POST",
+    headers: { ...headers(key), Prefer: "return=representation" },
+    body: JSON.stringify({ client_id: clientId, sender, body: cleanBody }),
+  });
+  if (!response.ok) await fail("Envoi du message", response);
+  return ((await response.json()) as ClientMessage[])[0];
 }

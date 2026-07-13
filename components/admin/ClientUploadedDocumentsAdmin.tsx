@@ -40,13 +40,13 @@ export function ClientUploadedDocumentsAdmin({
       {documents.map((document) => (
         <div key={document.id} className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74">
           <span className="min-w-0">
-            <span className="block truncate">{document.file_name}</span>
+            <span className="block truncate">{document.file_name} <small className="rounded-full bg-white px-2 py-1">v{document.version || 1} · {document.status}</small></span>
             <span className="mt-1 block text-xs text-navy/42">
               {formatDateFr(document.created_at)}
               {document.file_size ? ` - ${(document.file_size / 1024).toFixed(1)} Ko` : ""}
             </span>
           </span>
-          <span className="flex shrink-0 gap-2">
+          {document.status === "active" ? <span className="flex shrink-0 gap-2">
             <a
               href={`/api/admin/client-uploads/${document.id}/download?clientId=${clientId}`}
               aria-label="Télécharger"
@@ -64,7 +64,7 @@ export function ClientUploadedDocumentsAdmin({
             >
               <Trash2 className="h-4 w-4" />
             </button>
-          </span>
+          </span> : <span className="text-xs font-black uppercase tracking-wider text-navy/35">Archivé</span>}
         </div>
       ))}
     </div>

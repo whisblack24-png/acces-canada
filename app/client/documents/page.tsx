@@ -20,8 +20,8 @@ export default async function ClientDocumentsPage() {
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) redirect("/client/login");
 
-  const [uploads, generatedDocuments] = await Promise.all([
-    listClientUploads(client.id).catch(() => []),
+  const [uploadHistory, generatedDocuments] = await Promise.all([
+    listClientUploads(client.id, true).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
   ]);
 
@@ -38,7 +38,7 @@ export default async function ClientDocumentsPage() {
 
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <ClientPanel title="Envoyer un document" icon={<UploadCloud className="h-5 w-5" />}>
-            <ClientUploadForm initialUploads={uploads} />
+            <ClientUploadForm initialUploads={uploadHistory.filter((document) => document.status === "active")} />
           </ClientPanel>
 
           <ClientPanel title="Documents générés par Accès Canada" icon={<FileText className="h-5 w-5" />}>
@@ -63,6 +63,9 @@ export default async function ClientDocumentsPage() {
             </div>
           </ClientPanel>
         </div>
+        <ClientPanel title="Historique de mes documents" icon={<FileText className="h-5 w-5" />}>
+          <div className="space-y-3">{uploadHistory.length ? uploadHistory.map((document) => <div key={document.id} className="flex items-center justify-between rounded-2xl bg-ivory p-4"><span><strong className="block text-navy">{document.file_name}</strong><small className="text-navy/45">{formatDateFr(document.created_at)} · version {document.version || 1} · {document.category || "autre"}</small></span><span className={`rounded-full px-3 py-1 text-xs font-black ${document.status === "active" ? "bg-gold text-navy" : "bg-navy/8 text-navy/45"}`}>{document.status === "active" ? "Actif" : document.status === "replaced" ? "Remplacé" : "Supprimé"}</span></div>) : <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun historique documentaire.</p>}</div>
+        </ClientPanel>
       </div>
     </ClientShell>
   );

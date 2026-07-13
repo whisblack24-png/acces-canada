@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { getClientSession } from "@/lib/client-auth";
-import { createClientUpload, listClientUploads, markClientUploadReceived, uploadClientFile } from "@/lib/client-portal";
+import { createClientUpload, listClientUploads, markClientUploadReceived, replaceClientFile, uploadClientFile } from "@/lib/client-portal";
 
 export const runtime = "nodejs";
 
@@ -26,6 +26,8 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
+    const category = String(formData.get("category") || "autre").trim().slice(0, 80) || "autre";
+    const replaceId = String(formData.get("replaceId") || "").trim();
     if (!(file instanceof File)) {
       return NextResponse.json({ message: "Fichier requis." }, { status: 400 });
     }
@@ -36,14 +38,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Le fichier ne doit pas depasser 8 Mo." }, { status: 400 });
     }
 
-    const filePath = await uploadClientFile(session.clientId, file);
-    const upload = await createClientUpload({
-      client_id: session.clientId,
-      file_name: file.name,
-      file_path: filePath,
-      file_type: file.type,
-      file_size: file.size,
-    });
+    const upload = replaceId
+      ? await replaceClientFile(session.clientId, replaceId, file, category)
+      : await (async () => {
+          const filePath = await uploadClientFile(session.clientId, file);
+          return createClientUpload({
+            client_id: session.clientId, file_name: file.name, file_path: filePath, file_type: file.type,
+            file_size: file.size, category, version: 1, status: "active", replaced_document_id: null,
+          });
+        })();
     await markClientUploadReceived(session.clientId, file.name);
 
     return NextResponse.json({ upload }, { status: 201 });

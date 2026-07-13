@@ -1,15 +1,19 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, Download, FileCheck2, FileText, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, CreditCard, Download, FileCheck2, FileText, Mail, MapPin, MessageSquare, Phone } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ClientDossierActions } from "@/components/admin/ClientDossierActions";
 import { ClientProductionActions } from "@/components/admin/ClientProductionActions";
 import { ClientUploadedDocumentsAdmin } from "@/components/admin/ClientUploadedDocumentsAdmin";
+import { SecureMessages } from "@/components/client/SecureMessages";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
 import { listGeneratedDocumentsForClient } from "@/lib/admin-documents";
-import { listClientUploads } from "@/lib/client-portal";
+import { listClientMessages, listClientUploads } from "@/lib/client-portal";
+import { formatDateTimeFr, listAppointmentsForEmail } from "@/lib/booking";
+import { listClientPayments } from "@/lib/production-workflow";
+import { formatMoney } from "@/lib/format";
 import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
 
@@ -39,9 +43,12 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
   const received = client.documents_received || [];
   const missing = client.documents_missing || [];
-  const [uploadedDocuments, generatedDocuments] = await Promise.all([
-    listClientUploads(client.id).catch(() => []),
+  const [uploadedDocuments, generatedDocuments, appointments, payments, messages] = await Promise.all([
+    listClientUploads(client.id, true).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
+    listAppointmentsForEmail(client.email).catch(() => []),
+    listClientPayments(client.id).catch(() => []),
+    listClientMessages(client.id).catch(() => []),
   ]);
   const history = client.action_history?.length
     ? client.action_history
@@ -128,6 +135,21 @@ export default async function ClientDossierPage({ params }: PageProps) {
                   </div>
                 ))}
               </div>
+            </Panel>
+
+            <Panel title="Rendez-vous et factures" icon={<CalendarClock className="h-5 w-5" />}>
+              {appointments.length ? appointments.map((appointment) => <div key={appointment.id} className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4">
+                <span><span className="block font-black text-navy">{formatDateTimeFr(appointment.starts_at)}</span><span className="text-xs font-bold text-navy/45">{appointment.booking_reference} · {appointment.invoice_number}</span></span>
+                <a href={`/api/admin/appointments/${appointment.id}`} className="text-sm font-black text-canada">Voir</a>
+              </div>) : <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun rendez-vous.</p>}
+            </Panel>
+
+            <Panel title="Paiements" icon={<CreditCard className="h-5 w-5" />}>
+              {payments.length ? payments.map((payment) => <div key={payment.id} className="flex items-center justify-between rounded-2xl bg-ivory p-4"><span><span className="block font-black">{payment.description}</span><span className="text-xs text-navy/45">{dateFr(payment.created_at)} · {payment.status}</span></span><strong>{formatMoney(payment.amount_cents / 100)} $</strong></div>) : <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun paiement complémentaire.</p>}
+            </Panel>
+
+            <Panel title="Messagerie sécurisée" icon={<MessageSquare className="h-5 w-5" />}>
+              <SecureMessages initialMessages={messages} adminClientId={client.id} />
             </Panel>
 
             <Panel title="Documents envoyés par le client" icon={<FileCheck2 className="h-5 w-5" />}>

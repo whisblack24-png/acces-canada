@@ -68,8 +68,8 @@ export default async function ClientDossierPage() {
 function dossierProgress(status: string) {
   const values: Record<string, { value: number; label: string }> = {
     nouveau: { value: 10, label: "Dossier créé" }, en_analyse: { value: 30, label: "Analyse en cours" },
-    documents_recus: { value: 50, label: "Documents reçus" }, depose: { value: 70, label: "Dossier soumis" },
-    soumis: { value: 70, label: "Dossier soumis" }, en_attente: { value: 85, label: "En attente" },
+    documents_recus: { value: 17, label: "Documents reçus" }, en_preparation: { value: 50, label: "Préparation du dossier" }, depose: { value: 67, label: "Dossier déposé" },
+    soumis: { value: 67, label: "Dossier déposé" }, en_attente: { value: 84, label: "Décision en attente" },
     termine: { value: 100, label: "Dossier terminé" }, approuve: { value: 100, label: "Dossier approuvé" },
   };
   return values[status] || { value: 30, label: "Traitement en cours" };
