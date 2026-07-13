@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
+import QRCode from "qrcode";
 import type { Appointment } from "./booking-shared";
 import { consultationModeLabels, consultationTypes, formatDateTimeFr } from "./booking-shared";
 import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "./format";
@@ -45,6 +46,36 @@ function labelValue(label: string, value: string, x: number, y: number, width = 
     text(value, x, y - 17, 10.5, "F2", INK),
     line(x, y - 27, x + width, y - 27, "0.890 0.900 0.910", 0.6),
   ].join("");
+}
+
+function paymentMethodLabel(value: string | null) {
+  const normalized = String(value || "card").trim().toLowerCase();
+  const labels: Record<string, string> = {
+    card: "Carte bancaire",
+    "carte bancaire": "Carte bancaire",
+    link: "Stripe Link",
+    paypal: "PayPal",
+    cashapp: "Cash App Pay",
+    us_bank_account: "Compte bancaire américain",
+    customer_balance: "Solde client",
+  };
+  return labels[normalized] || formatProperName(normalized.replace(/_/g, " "));
+}
+
+function qrCode(value: string, x: number, y: number, size: number) {
+  const qr = QRCode.create(value, { errorCorrectionLevel: "M" });
+  const moduleCount = qr.modules.size;
+  const quietZone = 4;
+  const cell = size / (moduleCount + quietZone * 2);
+  const commands = [rect(x, y, size, size, "1 1 1", 5)];
+  for (let row = 0; row < moduleCount; row += 1) {
+    for (let column = 0; column < moduleCount; column += 1) {
+      if (qr.modules.get(row, column)) {
+        commands.push(rect(x + (column + quietZone) * cell, y + size - (row + quietZone + 1) * cell, cell + 0.08, cell + 0.08, NAVY));
+      }
+    }
+  }
+  return commands.join("");
 }
 
 function paeth(a: number, b: number, c: number) {
@@ -136,17 +167,20 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   const phone = formatPhoneNumber(appointment.client_phone);
   const country = formatCountryName(appointment.client_country);
   const amount = `${formatMoney(appointment.amount_cents / 100)} US`;
+  const method = paymentMethodLabel(appointment.payment_method_label);
   const transaction = appointment.stripe_payment_intent || appointment.stripe_session_id;
   const compactTransaction = transaction.length > 34 ? `${transaction.slice(0, 18)}…${transaction.slice(-10)}` : transaction;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || "https://acces-canada.vercel.app").replace(/\/$/, "");
+  const verificationUrl = `${siteUrl}/facture/verifier/${encodeURIComponent(appointment.stripe_session_id)}`;
   const content: string[] = [];
 
   content.push(rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, "1 1 1"));
   content.push(rect(0, 632, PAGE_WIDTH, 210, NAVY));
   content.push(rect(0, 626, PAGE_WIDTH, 6, GOLD));
-  content.push(rect(38, 734, 72, 72, "1 1 1", 12));
-  content.push("q 64 0 0 64 42 738 cm /Im1 Do Q\n");
-  content.push(text("ACCÈS CANADA", 126, 778, 20, "F2", "1 1 1"));
-  content.push(text(brand.slogan, 126, 758, 9.5, "F1", "0.760 0.800 0.850"));
+  content.push(rect(30, 718, 98, 98, "1 1 1", 15));
+  content.push("q 88 0 0 88 35 723 cm /Im1 Do Q\n");
+  content.push(text("ACCÈS CANADA", 148, 778, 20, "F2", "1 1 1"));
+  content.push(text(brand.slogan, 148, 758, 9.5, "F1", "0.760 0.800 0.850"));
   content.push(text("FACTURE", 436, 782, 10, "F2", GOLD));
   content.push(text(appointment.invoice_number, 386, 754, 16, "F2", "1 1 1"));
   content.push(rect(386, 690, 158, 34, GOLD, 17));
@@ -184,7 +218,7 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   content.push(text("TOTAL", 470, 272, 7.5, "F2", MUTED));
   content.push(line(52, 258, 543, 258, "0.850 0.865 0.885", 0.8));
   content.push(text(consultationTypes[appointment.consultation_type].label, 52, 232, 11, "F2", INK));
-  content.push(text(appointment.payment_method_label || "Carte bancaire", 304, 232, 10, "F1", INK));
+  content.push(text(method, 304, 232, 10, "F1", INK));
   content.push(text(amount, 465, 232, 12, "F2", NAVY));
   content.push(text(`Paiement confirmé le ${formatDateFr(appointment.confirmed_at || appointment.created_at)}`, 52, 211, 8.5, "F1", MUTED));
 
@@ -192,12 +226,15 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   content.push(rect(34, 106, 5, 22, RED, 2));
   content.push(text("Référence de réservation", 52, 121, 7.5, "F2", "0.650 0.700 0.760"));
   content.push(text(appointment.booking_reference, 52, 101, 11, "F2", "1 1 1"));
-  content.push(text("Transaction Stripe", 250, 121, 7.5, "F2", "0.650 0.700 0.760"));
-  content.push(text(compactTransaction, 250, 101, 8, "F1", "1 1 1"));
-  content.push(line(34, 78, 561, 78, "0.180 0.240 0.320", 0.8));
-  content.push(text(`${brand.phone}   •   ${brand.email}`, 34, 52, 9, "F1", "0.800 0.830 0.870"));
-  content.push(text("Canada et international", 428, 52, 9, "F2", GOLD));
-  content.push(text("Document généré électroniquement par Accès Canada.", 34, 28, 7.5, "F1", "0.500 0.560 0.640"));
+  content.push(text("INFORMATIONS TECHNIQUES", 250, 125, 6.5, "F2", "0.650 0.700 0.760"));
+  content.push(text("Référence Stripe", 250, 110, 6.5, "F1", "0.650 0.700 0.760"));
+  content.push(text(compactTransaction, 250, 96, 6.5, "F1", "0.900 0.920 0.950"));
+  content.push(qrCode(verificationUrl, 493, 84, 58));
+  content.push(text("VÉRIFIER", 505, 72, 6, "F2", GOLD));
+  content.push(line(34, 62, 561, 62, "0.180 0.240 0.320", 0.8));
+  content.push(text(`${brand.phone}   •   ${brand.email}`, 34, 42, 8, "F1", "0.800 0.830 0.870"));
+  content.push(text("Canada et international", 428, 42, 8, "F2", GOLD));
+  content.push(text("Document électronique officiel émis par Accès Canada. Cette facture fait foi de paiement.", 34, 20, 7, "F1", "0.500 0.560 0.640"));
 
   const builder = new PdfBuilder();
   builder.object(1, "<< /Type /Catalog /Pages 2 0 R >>");

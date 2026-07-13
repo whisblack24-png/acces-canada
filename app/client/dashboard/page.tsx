@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, CreditCard, FileSignature, FileText, FolderKanban, UploadCloud } from "lucide-react";
+import { Bell, CalendarDays, CheckCircle2, CreditCard, FileSignature, FileText, FolderKanban, UploadCloud } from "lucide-react";
 import { ClientPanel, ClientShell } from "@/components/client/ClientShell";
 import { ClientUploadForm } from "@/components/client/ClientUploadForm";
 import { ClientPaymentPanel, ClientSignaturePanel } from "@/components/client/ClientProductionActions";
@@ -32,6 +32,8 @@ export default async function ClientDashboardPage() {
     listClientPayments(client.id).catch(() => []),
     listAppointmentsForEmail(client.email).catch(() => []),
   ]);
+  const progress = dossierProgress(client.status);
+  const upcomingAppointments = appointments.filter((appointment) => appointment.status === "confirmed" && new Date(appointment.starts_at) >= new Date());
 
   return (
     <ClientShell>
@@ -50,6 +52,33 @@ export default async function ClientDashboardPage() {
           <Stat label="Référence" value={client.file_reference || "À créer"} />
           <Stat label="Documents" value={`${uploads.length} envoyés / ${documents.length} générés`} />
         </section>
+
+        <ClientPanel title="Progression du dossier" icon={<FolderKanban className="h-5 w-5" />}>
+          <div className="flex items-center justify-between text-sm font-black text-navy"><span>{progress.label}</span><span>{progress.value} %</span></div>
+          <div className="mt-3 h-3 overflow-hidden rounded-full bg-navy/8"><div className="h-full rounded-full bg-gradient-to-r from-canada via-gold to-navy" style={{ width: `${progress.value}%` }} /></div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-navy/42 sm:grid-cols-6">
+            {["Nouveau", "En cours", "Documents", "Soumis", "Attente", "Terminé"].map((step) => <span key={step}>{step}</span>)}
+          </div>
+        </ClientPanel>
+
+        <div className="grid gap-6 xl:grid-cols-2">
+          <ClientPanel title="Mes prochains rendez-vous" icon={<CalendarDays className="h-5 w-5" />}>
+            <div className="space-y-3">
+              {upcomingAppointments.length ? upcomingAppointments.map((appointment) => (
+                <div key={appointment.id} className="rounded-2xl bg-ivory p-4">
+                  <p className="font-black text-navy">{formatDateTimeFr(appointment.starts_at)}</p>
+                  <p className="mt-1 text-sm font-bold text-navy/52">{appointment.booking_reference} · {appointment.duration_minutes} minutes</p>
+                </div>
+              )) : <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun rendez-vous à venir.</p>}
+            </div>
+          </ClientPanel>
+          <ClientPanel title="Notifications de l’équipe" icon={<Bell className="h-5 w-5" />}>
+            <div className="rounded-2xl border border-gold/30 bg-gold/10 p-5">
+              <p className="font-black text-navy">Mise à jour du dossier : {statusLabels[client.status] || client.status}</p>
+              <p className="mt-2 text-sm font-bold leading-6 text-navy/62">{client.public_notes || "Aucun nouveau message de l’équipe pour le moment."}</p>
+            </div>
+          </ClientPanel>
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <ClientPanel title="Documents manquants" icon={<FileText className="h-5 w-5" />}>
@@ -134,6 +163,21 @@ export default async function ClientDashboardPage() {
       </div>
     </ClientShell>
   );
+}
+
+function dossierProgress(status: string) {
+  const values: Record<string, { value: number; label: string }> = {
+    nouveau: { value: 10, label: "Dossier créé" },
+    en_analyse: { value: 30, label: "Analyse en cours" },
+    documents_recus: { value: 50, label: "Documents reçus" },
+    depose: { value: 70, label: "Dossier soumis" },
+    soumis: { value: 70, label: "Dossier soumis" },
+    en_attente: { value: 85, label: "En attente de décision" },
+    termine: { value: 100, label: "Dossier terminé" },
+    approuve: { value: 100, label: "Dossier approuvé" },
+    refuse: { value: 100, label: "Décision reçue" },
+  };
+  return values[status] || { value: 30, label: "Traitement en cours" };
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

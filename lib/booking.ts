@@ -560,6 +560,42 @@ ${brand.email}`,
   logBooking("smtp_accepted", appointment.stripe_session_id, { appointmentId: appointment.id });
 }
 
+export async function sendAppointmentReminderEmail(appointment: Appointment) {
+  const host = process.env.SMTP_HOST?.trim();
+  const port = Number(process.env.SMTP_PORT || 465);
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS?.trim();
+  const from = process.env.SMTP_FROM?.trim() || user;
+  if (!host || !user || !pass || !from) throw new Error("Configuration SMTP incomplète pour le rappel.");
+
+  await sendSmtpMail({
+    host,
+    port,
+    secure: process.env.SMTP_SECURE === "true" || (process.env.SMTP_SECURE == null && port === 465),
+    startTls: port !== 465 && process.env.SMTP_STARTTLS !== "false",
+    user,
+    pass,
+    from,
+    to: appointment.client_email,
+    subject: `Rappel Accès Canada - ${appointment.booking_reference}`,
+    text: `Bonjour ${formatProperName(appointment.client_full_name)},
+
+Nous vous rappelons votre rendez-vous Accès Canada prévu le ${formatDateTimeFr(appointment.starts_at)}.
+
+Service : ${consultationTypes[appointment.consultation_type].label}
+Mode : ${consultationModeLabels[appointment.consultation_mode]}
+Durée : ${appointment.duration_minutes} minutes
+Réservation : ${appointment.booking_reference}
+
+Merci d'être disponible quelques minutes avant l'heure prévue.
+
+Accès Canada
+${brand.phone}
+${brand.email}`,
+  });
+  logBooking("reminder_accepted", appointment.stripe_session_id, { appointmentId: appointment.id });
+}
+
 export async function cancelAppointment(id: string) {
   const { url, key, table } = config();
   const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {

@@ -45,6 +45,21 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
     });
   }, [appointments, search, status, date]);
 
+  const calendarDays = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(today);
+      day.setDate(today.getDate() + index);
+      const key = day.toISOString().slice(0, 10);
+      return {
+        key,
+        label: day.toLocaleDateString("fr-CA", { weekday: "short", day: "numeric", month: "short" }),
+        appointments: appointments.filter((item) => item.status === "confirmed" && item.starts_at.slice(0, 10) === key),
+      };
+    });
+  }, [appointments]);
+
   async function action(id: string, body: Record<string, string>) {
     setBusyId(id);
     setMessage("");
@@ -69,6 +84,23 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
   return (
     <div className="space-y-5">
       {message ? <p className="border border-gold/40 bg-[#FBF7EA] p-4 text-sm font-bold text-navy">{message}</p> : null}
+
+      <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
+        <div className="flex items-center justify-between gap-4">
+          <div><p className="text-xs font-black uppercase tracking-[0.18em] text-canada">Calendrier</p><h2 className="mt-2 font-display text-2xl font-black text-navy">Les 7 prochains jours</h2></div>
+          <CalendarClock className="h-6 w-6 text-gold" />
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+          {calendarDays.map((day) => (
+            <button key={day.key} type="button" onClick={() => setDate(day.key)} className="min-h-32 rounded-2xl border border-navy/10 bg-ivory p-3 text-left transition hover:border-gold">
+              <span className="block text-xs font-black uppercase text-navy/45">{day.label}</span>
+              <span className="mt-3 block text-2xl font-black text-navy">{day.appointments.length}</span>
+              <span className="text-xs font-bold text-navy/45">rendez-vous</span>
+              {day.appointments.slice(0, 2).map((item) => <span key={item.id} className="mt-2 block truncate text-[10px] font-black text-canada">{new Date(item.starts_at).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" })} · {item.client_first_name}</span>)}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-3 bg-white p-5 shadow-premium md:grid-cols-[1fr_180px_180px]">
         <label className="relative">

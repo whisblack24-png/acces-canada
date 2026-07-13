@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, CreditCard, Loader2, Phone, Video, UsersRound } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, Loader2, LogIn, Phone, Sparkles, Video, UsersRound } from "lucide-react";
 import { consultationModeLabels, consultationTypes, type ConsultationMode, type ConsultationType } from "@/lib/booking-shared";
 import { formatMoney } from "@/lib/format";
 
@@ -11,6 +11,10 @@ type Confirmation = {
   bookingReference?: string;
   invoiceNumber?: string;
   startsAt?: string;
+  consultationLabel?: string;
+  consultationMode?: string;
+  durationMinutes?: number;
+  amountCents?: number;
 };
 
 const modes: { value: ConsultationMode; icon: typeof Phone }[] = [
@@ -171,16 +175,25 @@ export function BookingForm() {
 
       {confirmation ? (
         <section className="m-5 border-2 border-gold bg-[#FBF7EA] p-6 text-center md:m-7 md:p-10" aria-live="polite">
-          <CheckCircle2 className="mx-auto h-14 w-14 text-canada" />
+          <div className="relative mx-auto grid h-20 w-20 place-items-center">
+            <span className="absolute inset-0 animate-ping rounded-full bg-gold/25" />
+            <span className="relative grid h-16 w-16 place-items-center rounded-full bg-navy text-gold shadow-premium">
+              <CheckCircle2 className="h-9 w-9" />
+            </span>
+            <Sparkles className="absolute -right-1 top-0 h-5 w-5 animate-pulse text-canada" />
+          </div>
           <p className="mt-5 text-xs font-black uppercase tracking-[0.24em] text-canada">Transaction Stripe acceptée</p>
           <h3 className="mt-3 font-display text-4xl font-black text-navy">Paiement confirmé</h3>
           <p className="mx-auto mt-4 max-w-2xl text-sm font-bold leading-7 text-navy/70">{message}</p>
 
           {confirmation.status === "confirmed" ? (
-            <div className="mx-auto mt-6 grid max-w-xl gap-3 bg-white p-5 text-left text-sm font-bold text-navy/70">
-              <p><span className="text-navy">Numéro de réservation :</span> {confirmation.bookingReference}</p>
-              <p><span className="text-navy">Numéro de facture :</span> {confirmation.invoiceNumber}</p>
-              {confirmation.startsAt ? <p><span className="text-navy">Rendez-vous :</span> {new Date(confirmation.startsAt).toLocaleString("fr-CA")}</p> : null}
+            <div className="mx-auto mt-6 grid max-w-2xl gap-3 bg-white p-5 text-left text-sm font-bold text-navy/70 sm:grid-cols-2">
+              <Summary icon={<FileText />} label="Réservation" value={confirmation.bookingReference || "-"} />
+              <Summary icon={<FileText />} label="Facture" value={confirmation.invoiceNumber || "-"} />
+              {confirmation.startsAt ? <Summary icon={<CalendarDays />} label="Date et heure" value={new Date(confirmation.startsAt).toLocaleString("fr-CA")} /> : null}
+              <Summary icon={<Clock3 />} label="Consultation" value={`${confirmation.consultationLabel || "Consultation"} · ${confirmation.consultationMode || ""}`} />
+              <Summary icon={<Clock3 />} label="Durée" value={`${confirmation.durationMinutes || 0} minutes`} />
+              <Summary icon={<CreditCard />} label="Montant payé" value={`${formatMoney((confirmation.amountCents || 0) / 100)} US`} />
             </div>
           ) : (
             <p className="mt-6 font-black text-navy">Finalisation du rendez-vous en cours…</p>
@@ -192,6 +205,9 @@ export function BookingForm() {
                 Télécharger la facture PDF
               </a>
             ) : null}
+            <a href="/client/login" className="inline-flex items-center gap-2 bg-gold px-6 py-3 text-sm font-black text-navy">
+              <LogIn className="h-4 w-4" /> Accéder à mon espace client
+            </a>
             <a href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Retour à l'accueil</a>
           </div>
         </section>
@@ -310,6 +326,15 @@ export function BookingForm() {
           Payer et confirmer le rendez-vous
         </button>
       </div>
+    </div>
+  );
+}
+
+function Summary({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-ivory p-3">
+      <span className="mt-0.5 text-gold [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      <span><span className="block text-[10px] uppercase tracking-[0.14em] text-navy/42">{label}</span><span className="mt-1 block text-navy">{value}</span></span>
     </div>
   );
 }

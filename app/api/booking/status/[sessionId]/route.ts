@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAppointmentByStripeSession } from "@/lib/booking";
+import { consultationModeLabels, consultationTypes } from "@/lib/booking-shared";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
         bookingReference: appointment.booking_reference,
         invoiceNumber: appointment.invoice_number,
         startsAt: appointment.starts_at,
+        consultationLabel: consultationTypes[appointment.consultation_type].label,
+        consultationMode: consultationModeLabels[appointment.consultation_mode],
+        durationMinutes: appointment.duration_minutes,
+        amountCents: appointment.amount_cents,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -17,6 +17,7 @@ export default async function ClientDossierPage() {
 
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) redirect("/client/login");
+  const progress = dossierProgress(client.status);
 
   return (
     <ClientShell>
@@ -42,6 +43,11 @@ export default async function ClientDossierPage() {
           </ClientPanel>
         </div>
 
+        <ClientPanel title="Avancement du dossier" icon={<FolderKanban className="h-5 w-5" />}>
+          <div className="flex items-center justify-between font-black"><span>{progress.label}</span><span>{progress.value} %</span></div>
+          <div className="mt-4 h-4 overflow-hidden rounded-full bg-navy/8"><div className="h-full rounded-full bg-gradient-to-r from-canada via-gold to-navy" style={{ width: `${progress.value}%` }} /></div>
+        </ClientPanel>
+
         <div className="grid gap-6 lg:grid-cols-2">
           <ClientPanel title="Documents reçus" icon={<FileCheck2 className="h-5 w-5" />}>
             <List items={client.documents_received || []} empty="Aucun document reçu indiqué." />
@@ -57,6 +63,16 @@ export default async function ClientDossierPage() {
       </div>
     </ClientShell>
   );
+}
+
+function dossierProgress(status: string) {
+  const values: Record<string, { value: number; label: string }> = {
+    nouveau: { value: 10, label: "Dossier créé" }, en_analyse: { value: 30, label: "Analyse en cours" },
+    documents_recus: { value: 50, label: "Documents reçus" }, depose: { value: 70, label: "Dossier soumis" },
+    soumis: { value: 70, label: "Dossier soumis" }, en_attente: { value: 85, label: "En attente" },
+    termine: { value: 100, label: "Dossier terminé" }, approuve: { value: 100, label: "Dossier approuvé" },
+  };
+  return values[status] || { value: 30, label: "Traitement en cours" };
 }
 
 function Info({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
