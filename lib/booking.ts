@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import QRCode from "qrcode";
 import { sendSmtpMail } from "@/lib/smtp";
 import { brand } from "@/lib/site";
+import { appointmentConfirmationEmailHtml } from "@/lib/appointment-confirmation-email";
 import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
 import { generatePremiumAppointmentInvoicePdf } from "@/lib/appointment-invoice";
 import {
@@ -516,6 +520,29 @@ export async function sendAppointmentConfirmationEmail(appointment: Appointment)
   logBooking("pdf_start", appointment.stripe_session_id, { appointmentId: appointment.id });
   const invoice = generateAppointmentInvoicePdf(appointment);
   logBooking("pdf_complete", appointment.stripe_session_id, { appointmentId: appointment.id, bytes: invoice.length });
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || "https://acces-canada.vercel.app").replace(/\/$/, "");
+  const invoiceUrl = `${siteUrl}/api/booking/invoice/session/${encodeURIComponent(appointment.stripe_session_id)}`;
+  const portalUrl = `${siteUrl}/client/login`;
+  const contactUrl = `${siteUrl}/contact`;
+  const startsAt = new Date(appointment.starts_at);
+  const [logo, qrCode] = await Promise.all([
+    readFile(join(process.cwd(), "public", "images", "logo.png")),
+    QRCode.toBuffer(invoiceUrl, { type: "png", width: 220, margin: 2, color: { dark: "#0B1D36", light: "#FFFFFF" } }),
+  ]);
+  const html = appointmentConfirmationEmailHtml({
+    clientName: formatProperName(appointment.client_full_name),
+    consultation: consultationTypes[appointment.consultation_type].label,
+    date: startsAt.toLocaleDateString("fr-CA", { dateStyle: "long", timeZone: "America/Toronto" }),
+    time: startsAt.toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" }),
+    duration: `${appointment.duration_minutes} minutes`,
+    mode: consultationModeLabels[appointment.consultation_mode],
+    bookingReference: appointment.booking_reference,
+    invoiceNumber: appointment.invoice_number,
+    amount: `${formatMoney(appointment.amount_cents / 100)} $ US`,
+    invoiceUrl,
+    portalUrl,
+    contactUrl,
+  });
   logBooking("smtp_start", appointment.stripe_session_id, { appointmentId: appointment.id, host, port });
   await sendSmtpMail({
     host: host!,
@@ -527,6 +554,7 @@ export async function sendAppointmentConfirmationEmail(appointment: Appointment)
     from: from!,
     to: appointment.client_email,
     subject: `Accès Canada - rendez-vous confirmé ${appointment.booking_reference}`,
+    html,
     text: `Bonjour ${appointment.client_full_name},
 
 Votre rendez-vous Accès Canada est confirmé.
@@ -550,6 +578,20 @@ Accès Canada
 ${brand.phone}
 ${brand.email}`,
     attachments: [
+      {
+        filename: "logo-acces-canada.png",
+        contentType: "image/png",
+        content: logo,
+        contentId: "acces-canada-logo",
+        disposition: "inline",
+      },
+      {
+        filename: "qr-facture.png",
+        contentType: "image/png",
+        content: qrCode,
+        contentId: "acces-canada-qr",
+        disposition: "inline",
+      },
       {
         filename: `${appointment.invoice_number}.pdf`,
         contentType: "application/pdf",

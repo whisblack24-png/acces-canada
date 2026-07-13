@@ -13,11 +13,14 @@ type SmtpOptions = {
   to: string;
   subject: string;
   text: string;
+  html?: string;
   replyTo?: string;
   attachments?: {
     filename: string;
     contentType: string;
     content: Buffer;
+    contentId?: string;
+    disposition?: "attachment" | "inline";
   }[];
 };
 
@@ -123,31 +126,49 @@ function formatMessage(options: SmtpOptions) {
     "MIME-Version: 1.0",
   ];
 
-  if (attachments.length) {
-    const boundary = `acces-canada-${randomUUID()}`;
+  if (attachments.length || options.html) {
+    const mixedBoundary = `acces-canada-mixed-${randomUUID()}`;
+    const alternativeBoundary = `acces-canada-alternative-${randomUUID()}`;
     return [
       ...headers,
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
       "",
-      `--${boundary}`,
+      `--${mixedBoundary}`,
+      `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+      "",
+      `--${alternativeBoundary}`,
       'Content-Type: text/plain; charset="UTF-8"',
       "Content-Transfer-Encoding: base64",
       "",
       wrapBase64(options.text),
       "",
+      ...(options.html
+        ? [
+            `--${alternativeBoundary}`,
+            'Content-Type: text/html; charset="UTF-8"',
+            "Content-Transfer-Encoding: base64",
+            "",
+            wrapBase64(options.html),
+            "",
+          ]
+        : []),
+      `--${alternativeBoundary}--`,
+      "",
       ...attachments.flatMap((attachment) => {
         const filename = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const disposition = attachment.disposition || "attachment";
         return [
-          `--${boundary}`,
+          `--${mixedBoundary}`,
           `Content-Type: ${attachment.contentType}; name="${filename}"`,
           "Content-Transfer-Encoding: base64",
-          `Content-Disposition: attachment; filename="${filename}"`,
+          `Content-Disposition: ${disposition}; filename="${filename}"`,
+          ...(attachment.contentId ? [`Content-ID: <${attachment.contentId}>`] : []),
           "",
           wrapBase64(attachment.content),
           "",
         ];
       }),
-      `--${boundary}--`,
+      `--${mixedBoundary}--`,
       "",
     ].join("\r\n");
   }
