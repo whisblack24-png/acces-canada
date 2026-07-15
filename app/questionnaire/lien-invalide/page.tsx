@@ -1,0 +1,3 @@
+import Link from "next/link";
+export default function InvalidQuestionnaireLinkPage() { return <main className="grid min-h-screen place-items-center bg-ivory p-5"><section className="max-w-lg rounded-[2rem] bg-white p-9 text-center shadow-premium"><h1 className="font-display text-3xl font-black text-navy">Lien non valide</h1><p className="mt-4 leading-7 text-navy/65">Ce lien a expiré, a été désactivé ou a déjà été remplacé. Contactez Accès Canada pour recevoir un nouveau lien sécurisé.</p><Link href="/contact" className="mt-6 inline-flex rounded-full bg-canada px-6 py-3 font-black text-white">Nous contacter</Link></section></main>; }
+

@@ -28,11 +28,11 @@ test("le mode de l'événement doit correspondre à la clé Stripe", () => {
   assert.equal(stripeEventMatchesConfiguredMode(false, "sk_live_example"), false);
 });
 
-test("la production refuse toute clé Stripe Test", () => {
-  assert.equal(assertStripeKeyForEnvironment("sk_live_example", "production"), "live");
-  assert.equal(assertStripeKeyForEnvironment("sk_test_example", "preview"), "test");
+test("le mode Stripe explicite conserve le paiement en Test", () => {
+  assert.equal(assertStripeKeyForEnvironment("sk_test_example", "test"), "test");
+  assert.equal(assertStripeKeyForEnvironment("sk_live_example", "live"), "live");
   assert.throws(
-    () => assertStripeKeyForEnvironment("sk_test_example", "production"),
-    /refuse de créer une session Stripe avec une clé Test/,
+    () => assertStripeKeyForEnvironment("sk_live_example", "test"),
+    /ne correspond pas au mode test/,
   );
 });

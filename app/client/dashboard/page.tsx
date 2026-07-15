@@ -14,6 +14,8 @@ import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
 import { formatDateTimeFr, listAppointmentsForEmail } from "@/lib/booking";
 import { listClientPayments, listClientSignatures } from "@/lib/production-workflow";
+import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
+import { caseSteps } from "@/lib/questionnaire-definitions";
 
 export const metadata: Metadata = {
   title: "Tableau de bord client",
@@ -26,15 +28,18 @@ export default async function ClientDashboardPage() {
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) redirect("/client/login");
 
-  const [uploads, documents, signatures, payments, appointments, messages] = await Promise.all([
+  const [uploads, documents, signatures, payments, appointments, messages, questionnaires, caseProgress] = await Promise.all([
     listClientUploads(client.id).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
     listClientSignatures(client.id).catch(() => []),
     listClientPayments(client.id).catch(() => []),
     listAppointmentsForEmail(client.email).catch(() => []),
     listClientMessages(client.id).catch(() => []),
+    listQuestionnaires(client.id).catch(() => []),
+    listCaseProgress(client.id).catch(() => []),
   ]);
-  const progress = dossierProgress(client.status);
+  const completedSteps = caseProgress.filter((step) => step.status === "completed" || step.status === "not_applicable").length;
+  const progress = caseProgress.length ? { value: Math.round(completedSteps / caseProgress.length * 100), label: caseProgress.find((step) => step.status === "in_progress") ? "Traitement en cours" : "Progression du dossier" } : dossierProgress(client.status);
   const upcomingAppointments = appointments.filter((appointment) => appointment.status === "confirmed" && new Date(appointment.starts_at) >= new Date());
 
   return (
@@ -58,9 +63,13 @@ export default async function ClientDashboardPage() {
         <ClientPanel title="Progression du dossier" icon={<FolderKanban className="h-5 w-5" />}>
           <div className="flex items-center justify-between text-sm font-black text-navy"><span>{progress.label}</span><span>{progress.value} %</span></div>
           <div className="mt-3 h-3 overflow-hidden rounded-full bg-navy/8"><div className="h-full rounded-full bg-gradient-to-r from-canada via-gold to-navy" style={{ width: `${progress.value}%` }} /></div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] font-black uppercase tracking-[0.12em] text-navy/42 sm:grid-cols-6">
-            {["Documents reçus", "Analyse", "Préparation", "Dépôt", "Décision", "Terminé"].map((step) => <span key={step}>{step}</span>)}
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {caseSteps.map(([key, title]) => { const row = caseProgress.find((item) => item.step_key === key); return <div key={key} className={`rounded-xl p-3 text-xs font-black ${row?.status === "completed" ? "bg-emerald-50 text-emerald-700" : row?.status === "in_progress" ? "bg-gold/15 text-navy" : "bg-ivory text-navy/45"}`}>{title}<span className="mt-1 block text-[10px] uppercase">{row?.status === "completed" ? "Terminée" : row?.status === "in_progress" ? "En cours" : row?.status === "not_applicable" ? "Non applicable" : "À faire"}</span></div>; })}
           </div>
+        </ClientPanel>
+
+        <ClientPanel title="Questionnaire client" icon={<FileText className="h-5 w-5" />}>
+          {questionnaires.find((row) => row.questionnaire_type === "client_principal")?.status === "submitted" ? <p className="rounded-2xl bg-emerald-50 p-4 font-bold text-emerald-700">Votre questionnaire a été soumis. Accès Canada peut maintenant l’analyser.</p> : <div className="rounded-2xl bg-ivory p-5"><p className="font-bold leading-6 text-navy/70">Complétez vos renseignements à votre rythme. Chaque brouillon est sauvegardé de façon sécurisée.</p><a href="/api/client/questionnaire/session" className="mt-4 inline-flex rounded-full bg-canada px-5 py-3 text-sm font-black text-white">Remplir ou reprendre</a></div>}
         </ClientPanel>
 
         <div className="grid gap-6 xl:grid-cols-2">

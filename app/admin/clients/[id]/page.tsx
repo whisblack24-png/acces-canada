@@ -6,6 +6,8 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ClientDossierActions } from "@/components/admin/ClientDossierActions";
 import { ClientProductionActions } from "@/components/admin/ClientProductionActions";
 import { ClientUploadedDocumentsAdmin } from "@/components/admin/ClientUploadedDocumentsAdmin";
+import { ClientQuestionnaires } from "@/components/admin/ClientQuestionnaires";
+import { CaseProgressManager } from "@/components/admin/CaseProgressManager";
 import { SecureMessages } from "@/components/client/SecureMessages";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
@@ -16,6 +18,7 @@ import { listClientPayments } from "@/lib/production-workflow";
 import { formatMoney } from "@/lib/format";
 import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
+import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
 
 export const metadata: Metadata = {
   title: "Dossier client",
@@ -43,12 +46,14 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
   const received = client.documents_received || [];
   const missing = client.documents_missing || [];
-  const [uploadedDocuments, generatedDocuments, appointments, payments, messages] = await Promise.all([
+  const [uploadedDocuments, generatedDocuments, appointments, payments, messages, questionnaires, caseProgress] = await Promise.all([
     listClientUploads(client.id, true).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
     listAppointmentsForEmail(client.email).catch(() => []),
     listClientPayments(client.id).catch(() => []),
     listClientMessages(client.id).catch(() => []),
+    listQuestionnaires(client.id).catch(() => []),
+    listCaseProgress(client.id).catch(() => []),
   ]);
   const history = client.action_history?.length
     ? client.action_history
@@ -135,6 +140,14 @@ export default async function ClientDossierPage({ params }: PageProps) {
                   </div>
                 ))}
               </div>
+            </Panel>
+
+            <Panel title="Questionnaires intelligents" icon={<FileText className="h-5 w-5" />}>
+              <ClientQuestionnaires clientId={client.id} initialRows={questionnaires} />
+            </Panel>
+
+            <Panel title="Progression détaillée du dossier" icon={<FileCheck2 className="h-5 w-5" />}>
+              <CaseProgressManager clientId={client.id} initialRows={caseProgress} />
             </Panel>
 
             <Panel title="Rendez-vous et factures" icon={<CalendarClock className="h-5 w-5" />}>

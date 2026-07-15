@@ -35,7 +35,7 @@ export function stripeEventMatchesConfiguredMode(
 
 export function assertStripeKeyForEnvironment(
   stripeSecretKey: string,
-  vercelEnvironment = process.env.VERCEL_ENV,
+  configuredMode = process.env.STRIPE_MODE || "test",
 ) {
   const mode = stripeSecretKey.startsWith("sk_live_")
     ? "live"
@@ -44,8 +44,11 @@ export function assertStripeKeyForEnvironment(
       : null;
 
   if (!mode) throw new Error("STRIPE_SECRET_KEY n'est pas une clé Stripe secrète valide.");
-  if (vercelEnvironment === "production" && mode !== "live") {
-    throw new Error("La production refuse de créer une session Stripe avec une clé Test.");
+  if (configuredMode !== "test" && configuredMode !== "live") {
+    throw new Error("STRIPE_MODE doit valoir test ou live.");
+  }
+  if (mode !== configuredMode) {
+    throw new Error(`La clé Stripe ne correspond pas au mode ${configuredMode} configuré.`);
   }
   return mode;
 }

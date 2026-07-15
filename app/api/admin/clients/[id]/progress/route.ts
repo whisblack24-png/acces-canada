@@ -1,0 +1,3 @@
+import { NextResponse } from "next/server"; import { isAdminAuthenticated } from "@/lib/admin-auth"; import { updateCaseProgress, type CaseStatus } from "@/lib/questionnaires";
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) { if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Non autorisé." }, { status: 401 }); const { id } = await params; const body = await request.json() as { stepKey: string; status: CaseStatus; note?: string }; try { return NextResponse.json(await updateCaseProgress(id, body.stepKey, body.status, String(body.note || "").slice(0, 2000))); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Erreur." }, { status: 400 }); } }
+
