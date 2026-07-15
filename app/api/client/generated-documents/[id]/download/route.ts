@@ -24,7 +24,7 @@ export async function GET(_request: Request, context: Context) {
   if (!client) return NextResponse.json({ message: "Client introuvable." }, { status: 404 });
 
   const pdf = generateClientPdf(client, document.document_type, document.included_information || {});
-  return new Response(pdf, {
+  return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${document.file_name}"`,

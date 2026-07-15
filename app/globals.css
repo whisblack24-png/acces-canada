@@ -31,6 +31,12 @@ textarea {
   font: inherit;
 }
 
+@layer components {
+  .action {
+    @apply grid h-10 w-10 place-items-center rounded-full bg-navy/5 text-navy transition hover:bg-gold;
+  }
+}
+
 :focus-visible {
   outline: 3px solid #d4af37;
   outline-offset: 3px;

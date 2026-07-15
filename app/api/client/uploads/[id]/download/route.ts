@@ -19,7 +19,7 @@ export async function GET(_request: Request, context: Context) {
   });
   if (!result) return NextResponse.json({ message: "Document introuvable." }, { status: 404 });
 
-  return new Response(result.bytes, {
+  return new Response(new Uint8Array(result.bytes), {
     headers: {
       "Content-Type": result.record.file_type || "application/octet-stream",
       "Content-Disposition": `attachment; filename="${result.record.file_name}"`,

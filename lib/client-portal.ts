@@ -1,5 +1,6 @@
 ﻿import type { AdminClient } from "@/lib/admin-data";
 import { hashClientCode } from "@/lib/client-auth";
+import { DOCUMENT_MAX_SIZE, DOCUMENT_MIME_TYPES } from "@/lib/document-categories";
 
 export type ClientUploadedDocument = {
   id: string;
@@ -14,6 +15,7 @@ export type ClientUploadedDocument = {
   status: "active" | "replaced" | "deleted";
   replaced_document_id: string | null;
   deleted_at: string | null;
+  uploaded_by: string;
 };
 
 export type ClientMessage = {
@@ -25,8 +27,8 @@ export type ClientMessage = {
   read_at: string | null;
 };
 
-const clientDocumentMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
-const clientDocumentMaxSize = 8 * 1024 * 1024;
+const clientDocumentMimeTypes = [...DOCUMENT_MIME_TYPES];
+const clientDocumentMaxSize = DOCUMENT_MAX_SIZE;
 
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
@@ -248,7 +250,7 @@ export async function uploadClientFile(clientId: string, file: File) {
       "Content-Type": file.type || "application/octet-stream",
       "x-upsert": "false",
     },
-    body: Buffer.from(await file.arrayBuffer()),
+    body: await file.arrayBuffer(),
   });
   if (!response.ok) await fail("Dépôt du fichier client", response);
   return path;
@@ -302,7 +304,7 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
   return record;
 }
 
-export async function replaceClientFile(clientId: string, previousId: string, file: File, category: string) {
+export async function replaceClientFile(clientId: string, previousId: string, file: File, category: string, uploadedBy: string) {
   const { url, key, uploadsTable } = config();
   const previousResponse = await fetch(
     `${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(previousId)}&client_id=eq.${encodeURIComponent(clientId)}&status=eq.active&select=*&limit=1`,
@@ -323,6 +325,7 @@ export async function replaceClientFile(clientId: string, previousId: string, fi
     version: Number(previous.version || 1) + 1,
     status: "active",
     replaced_document_id: previous.id,
+    uploaded_by: uploadedBy,
   });
   const patch = await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(previous.id)}`, {
     method: "PATCH",

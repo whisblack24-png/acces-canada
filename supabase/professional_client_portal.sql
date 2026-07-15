@@ -36,6 +36,8 @@ alter table public.client_uploaded_documents
   add column if not exists status text not null default 'active',
   add column if not exists replaced_document_id uuid references public.client_uploaded_documents(id) on delete set null,
   add column if not exists deleted_at timestamptz;
+alter table public.client_uploaded_documents
+  add column if not exists uploaded_by text not null default 'Client';
 alter table public.client_uploaded_documents drop constraint if exists client_uploaded_documents_status_check;
 alter table public.client_uploaded_documents add constraint client_uploaded_documents_status_check check (status in ('active', 'replaced', 'deleted'));
 create index if not exists client_uploaded_documents_history_idx on public.client_uploaded_documents(client_id, created_at desc);

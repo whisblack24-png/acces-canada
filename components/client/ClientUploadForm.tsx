@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Download, RefreshCw, Trash2, UploadCloud } from "lucide-react";
 import type { ClientUploadedDocument } from "@/lib/client-portal";
 import { formatDateFr } from "@/lib/format";
+import { DOCUMENT_ACCEPT, DOCUMENT_CATEGORIES } from "@/lib/document-categories";
 
 export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUploadedDocument[] }) {
   const router = useRouter();
@@ -41,19 +42,18 @@ export function ClientUploadForm({ initialUploads }: { initialUploads: ClientUpl
     <div className="space-y-6">
       <form onSubmit={submit} className="rounded-[1.5rem] border border-gold/25 bg-gold/10 p-5">
         <label className="block text-sm font-bold text-navy/70">
-          {replaceId ? "Sélectionner la nouvelle version" : "Ajouter un document PDF, JPG ou PNG"}
+          {replaceId ? "Sélectionner la nouvelle version" : "Ajouter un document PDF, JPG, PNG ou Word"}
           <input
             name="file"
             type="file"
-            accept="application/pdf,image/jpeg,image/png"
+            accept={DOCUMENT_ACCEPT}
             required
             className="mt-3 w-full rounded-2xl border border-navy/10 bg-white px-4 py-3 text-navy"
           />
         </label>
         <label className="mt-4 block text-sm font-bold text-navy/70">Catégorie
           <select name="category" className="mt-2 w-full rounded-2xl border border-navy/10 bg-white px-4 py-3 text-navy">
-            <option value="passeport">Passeport</option><option value="permis">Permis</option><option value="diplome">Diplôme</option>
-            <option value="releve">Relevé</option><option value="lettre">Lettre</option><option value="formulaire">Formulaire</option><option value="autre">Autre</option>
+            {DOCUMENT_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </label>
         {feedback ? <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-navy">{feedback}</p> : null}

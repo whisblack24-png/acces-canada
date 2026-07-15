@@ -8,13 +8,15 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
   }
 
   const { id } = await context.params;
-  const clientId = _request.url.includes("clientId=") ? new URL(_request.url).searchParams.get("clientId") : null;
+  const url = new URL(request.url);
+  const clientId = url.searchParams.get("clientId");
+  const disposition = url.searchParams.get("disposition") === "inline" ? "inline" : "attachment";
 
   if (!clientId) {
     return NextResponse.json({ message: "clientId requis." }, { status: 400 });
@@ -27,10 +29,10 @@ export async function GET(_request: Request, context: Context) {
 
   if (!result) return NextResponse.json({ message: "Document introuvable." }, { status: 404 });
 
-  return new Response(result.bytes, {
+  return new Response(new Uint8Array(result.bytes), {
     headers: {
       "Content-Type": result.record.file_type || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${result.record.file_name}"`,
+      "Content-Disposition": `${disposition}; filename="${result.record.file_name.replace(/["\r\n]/g, "-")}"`,
       "Cache-Control": "no-store",
     },
   });

@@ -27,7 +27,7 @@ export async function GET(_request: Request, context: Context) {
 
   const pdf = generateClientPdf(client, type);
 
-  return new Response(pdf, {
+  return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${documentFileName(client, type)}"`,

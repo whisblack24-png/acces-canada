@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     if (format === "excel") {
       const workbook = generateAdminReportExcel(report);
 
-      return new Response(workbook, {
+      return new Response(new Uint8Array(workbook), {
         headers: {
           "Content-Type": "application/vnd.ms-excel; charset=utf-8",
           "Content-Disposition": `attachment; filename="rapport-acces-canada-${fileDate}.xls"`,
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
     const pdf = generateAdminReportPdf(report);
 
-    return new Response(pdf, {
+    return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="rapport-acces-canada-${fileDate}.pdf"`,

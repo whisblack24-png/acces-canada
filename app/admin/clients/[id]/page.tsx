@@ -152,7 +152,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
               <SecureMessages initialMessages={messages} adminClientId={client.id} />
             </Panel>
 
-            <Panel title="Documents envoyés par le client" icon={<FileCheck2 className="h-5 w-5" />}>
+            <Panel title="Gestionnaire de documents" icon={<FileCheck2 className="h-5 w-5" />}>
               <ClientUploadedDocumentsAdmin clientId={client.id} documents={uploadedDocuments} />
             </Panel>
 
