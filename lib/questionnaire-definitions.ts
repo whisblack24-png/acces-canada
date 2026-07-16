@@ -54,7 +54,18 @@ export const questionnaireDefinitions: Record<QuestionnaireType, QuestionnaireSe
 };
 
 export function calculateQuestionnaireProgress(type: QuestionnaireType, answers: Record<string, unknown>) {
-  const required = questionnaireDefinitions[type].flatMap((section) => section.fields.filter((field) => field.required));
-  const complete = required.filter((field) => answers[field.key] === true || String(answers[field.key] ?? "").trim()).length;
-  return required.length ? Math.round((complete / required.length) * 100) : 0;
+  const fields = questionnaireDefinitions[type].flatMap((section) => section.fields);
+  const complete = fields.filter((field) => isQuestionnaireAnswerFilled(answers[field.key])).length;
+  return fields.length ? Math.round((complete / fields.length) * 100) : 0;
+}
+
+export function isQuestionnaireAnswerFilled(value: unknown) {
+  return value === true || (value !== false && String(value ?? "").trim().length > 0);
+}
+
+export function questionnaireLifecycleStatus(type: QuestionnaireType, answers: Record<string, unknown>) {
+  const progress = calculateQuestionnaireProgress(type, answers);
+  if (progress === 0) return "draft" as const;
+  if (progress === 100) return "completed" as const;
+  return "in_progress" as const;
 }

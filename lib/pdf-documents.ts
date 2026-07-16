@@ -1,6 +1,9 @@
 ﻿import type { AdminClient, ServiceType } from "@/lib/admin-data";
 import { serviceLabels, statusLabels } from "@/lib/admin-data";
 import { formatDateFr, formatMoney } from "@/lib/format";
+import type { QuestionnaireAnswers } from "@/lib/questionnaires";
+
+export type QuestionnaireDocumentData = { client?: QuestionnaireAnswers; guarantor?: QuestionnaireAnswers };
 
 export type ClientDocumentType =
   | "convention"
@@ -114,7 +117,12 @@ function signatureRows(options: DocumentGenerationOptions) {
       ] as [string, string][]);
 }
 
-function linesFor(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}) {
+function answer(data: QuestionnaireAnswers | undefined, key: string, fallback = "Non renseigné") {
+  const value = data?.[key];
+  return value === true ? "Oui" : value === false ? "Non" : String(value || "").trim() || fallback;
+}
+
+function linesFor(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}, questionnaireData: QuestionnaireDocumentData = {}) {
   const settings: DocumentGenerationOptions = {
     includePersonalInfo: true,
     includeContactInfo: true,
@@ -128,6 +136,8 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
   const issued = dateFr(new Date().toISOString());
   const received = client.documents_received?.length ? client.documents_received : ["Aucun document marqué comme reçu"];
   const missing = client.documents_missing?.length ? client.documents_missing : ["Aucun document marqué comme manquant"];
+  const principal = questionnaireData.client;
+  const guarantor = questionnaireData.guarantor;
 
   if (type === "convention") {
     return [
@@ -136,8 +146,10 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
       ["section", "Objet de la convention"],
       [
         "Texte",
-        "Accès Canada accompagne le client dans la préparation administrative de son dossier. Les décisions finales relèvent exclusivement des autorités canadiennes.",
+        `Accès Canada accompagne ${client.full_name} dans la préparation de sa demande de ${serviceLabels[client.service as ServiceType] || client.service}. Objet déclaré : ${answer(principal, "travel_purpose", "préparation administrative du dossier d'immigration")}. Les décisions finales relèvent exclusivement des autorités canadiennes.`,
       ],
+      ["Dates prévues", `${answer(principal, "arrival_date")} au ${answer(principal, "departure_date")}`],
+      ["Financement", answer(principal, "funding_source")],
       ["section", "Engagements"],
       ["Texte", "Le client s'engage à fournir des renseignements exacts, complets et vérifiables."],
       ["Texte", "Accès Canada assure un suivi professionnel, confidentiel et conforme aux informations communiquées."],
@@ -191,6 +203,10 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
         "Texte",
         "Le demandeur souhaite soumettre un dossier complet, cohérent et conforme aux exigences applicables. Les informations fournies devront être accompagnées des pièces justificatives pertinentes.",
       ],
+      ["Motif du voyage", answer(principal, "travel_purpose")],
+      ["Itinéraire", answer(principal, "itinerary", answer(principal, "cities"))],
+      ["Hébergement", answer(principal, "accommodation_details")],
+      ["Attaches et retour", answer(principal, "return_reasons")],
       ...notesRows(client, settings),
       ...signatureRows(settings),
     ];
@@ -207,7 +223,11 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
         "Texte",
         "Le signataire confirme être disposé à soutenir financièrement le bénéficiaire selon les besoins du dossier et les justificatifs présentés.",
       ],
-      ...(settings.includePayments ? ([["Montant de référence", money(client.paid_amount)]] as [string, string][]) : []),
+      ["Garant", `${answer(guarantor, "given_names")} ${answer(guarantor, "family_name")}`],
+      ["Lien avec le client", answer(guarantor, "relationship")],
+      ["Dépenses couvertes", answer(guarantor, "covered_expenses")],
+      ["Contribution maximale", `${answer(guarantor, "maximum_contribution")} ${answer(guarantor, "contribution_currency", "")}`.trim()],
+      ["Motif du soutien", answer(guarantor, "support_reason")],
       ...signatureRows(settings),
     ];
   }
@@ -223,6 +243,9 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
         "Texte",
         "L'invitation devra préciser le lien avec l'hôte, la durée prévue du séjour, l'adresse d'accueil et les responsabilités pendant le séjour.",
       ],
+      ["Durée du séjour", `${answer(principal, "arrival_date")} au ${answer(principal, "departure_date")}`],
+      ["Villes visitées", answer(principal, "cities")],
+      ["Adresse d'accueil", answer(principal, "accommodation_details")],
       ...signatureRows(settings),
     ];
   }
@@ -266,9 +289,9 @@ function writeObject(parts: string[], index: number, body: string, offsets: numb
   parts.push(`${index} 0 obj\n${body}\nendobj\n`);
 }
 
-export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}) {
+export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}, questionnaireData: QuestionnaireDocumentData = {}) {
   const title = documentLabels[type];
-  const rows = linesFor(client, type, options);
+  const rows = linesFor(client, type, options, questionnaireData);
   const content: string[] = [];
   let y = 760;
 

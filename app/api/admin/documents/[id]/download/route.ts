@@ -3,6 +3,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient } from "@/lib/admin-data";
 import { getGeneratedDocument } from "@/lib/admin-documents";
 import { generateClientPdf } from "@/lib/pdf-documents";
+import { getDecryptedQuestionnaires } from "@/lib/questionnaires";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,9 @@ export async function GET(_request: Request, context: Context) {
     return NextResponse.json({ message: "Client associe introuvable." }, { status: 404 });
   }
 
-  const pdf = generateClientPdf(client, document.document_type, document.included_information || {});
+  const questionnaires = await getDecryptedQuestionnaires(client.id);
+  const data = Object.fromEntries(questionnaires.map(({ row, answers }) => [row.questionnaire_type === "client_principal" ? "client" : "guarantor", answers]));
+  const pdf = generateClientPdf(client, document.document_type, document.included_information || {}, data);
 
   return new Response(new Uint8Array(pdf), {
     headers: {
