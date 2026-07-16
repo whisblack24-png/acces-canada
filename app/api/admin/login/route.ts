@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getAdminConfigurationError, setAdminSession, verifyAdminPassword } from "@/lib/admin-auth";
+import { getAdminConfigurationError, ownerIdentity, setAdminSession, verifyAdminPassword } from "@/lib/admin-auth";
 import { checkRateLimit, requestIp } from "@/lib/rate-limit";
-import { createAuditLog } from "@/lib/platform-v2";
+import { authenticateStaffMember, createAuditLog } from "@/lib/platform-v2";
 
 export const runtime = "nodejs";
 
@@ -18,15 +18,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as { password?: string };
-    if (!verifyAdminPassword(String(body.password || ""))) {
+    const body = (await request.json()) as { email?:string; password?: string };
+    const email=String(body.email||"").trim().toLowerCase();
+    const identity=email?await authenticateStaffMember(email,String(body.password||"")):verifyAdminPassword(String(body.password||""))?ownerIdentity:null;
+    if (!identity) {
       console.warn("[admin-login] Mot de passe administrateur refusé.");
       return NextResponse.json({ message: "Mot de passe administrateur incorrect." }, { status: 401 });
     }
 
     console.info("[admin-login] Connexion administrateur réussie.");
-    await createAuditLog({ action:"login", entityType:"admin_session", summary:"Connexion administrateur réussie", ipAddress:requestIp(request), userAgent:request.headers.get("user-agent")||undefined }).catch((error)=>console.error("[audit] connexion",error));
-    return setAdminSession(NextResponse.json({ message: "Connexion réussie." }));
+    await createAuditLog({ actorId:identity.id, action:"login", entityType:"admin_session", summary:`Connexion réussie · ${identity.name}`, ipAddress:requestIp(request), userAgent:request.headers.get("user-agent")||undefined }).catch((error)=>console.error("[audit] connexion",error));
+    return setAdminSession(NextResponse.json({ message: "Connexion réussie." }),identity);
   } catch (error) {
     console.error("[admin-login] Erreur inattendue:", error);
     return NextResponse.json({ message: "Connexion impossible en raison d'une erreur serveur." }, { status: 500 });

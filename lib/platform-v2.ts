@@ -1,9 +1,13 @@
+import type { AdminIdentity } from "@/lib/admin-auth";
+
 export type AdminNotification = { id:string; client_id:string|null; notification_type:string; title:string; message:string; severity:"info"|"success"|"warning"|"urgent"; href:string|null; status:"unread"|"read"|"dismissed"; dedupe_key:string|null; created_at:string; read_at:string|null };
 export type AuditLog = { id:string; actor_id:string; actor_type:"system"|"staff"|"client"|"public"; action:string; entity_type:string; entity_id:string|null; client_id:string|null; summary:string; metadata:Record<string,unknown>; ip_address:string|null; user_agent:string|null; created_at:string };
 export type UniversalSearchResult = { id:string; type:"Client"|"Dossier"|"Document"|"Facture"|"Paiement"|"Rendez-vous"; title:string; subtitle:string; href:string };
 
 function config(){const url=process.env.SUPABASE_URL?.replace(/\/$/,"");const key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)throw new Error("Configuration Supabase V2 manquante.");return{url,key};}
 function headers(prefer?:string){const{key}=config();return{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json",...(prefer?{Prefer:prefer}:{})};}
+
+export async function authenticateStaffMember(email:string,password:string):Promise<AdminIdentity|null>{const{url,key}=config();const authResponse=await fetch(`${url}/auth/v1/token?grant_type=password`,{method:"POST",headers:{apikey:key,Authorization:`Bearer ${key}`,"Content-Type":"application/json"},body:JSON.stringify({email:email.trim().toLowerCase(),password})});if(!authResponse.ok)return null;const auth=await authResponse.json() as {user?:{id?:string;email?:string}};if(!auth.user?.id)return null;const members=await rows<{id:string;auth_user_id:string|null;email:string;full_name:string;role:AdminIdentity["role"];status:string}>("staff_members",`or=(auth_user_id.eq.${encodeURIComponent(auth.user.id)},email.eq.${encodeURIComponent(email.trim().toLowerCase())})&status=eq.active&select=*&limit=1`);const member=members[0];if(!member)return null;const{url:base}=config();await fetch(`${base}/rest/v1/staff_members?id=eq.${member.id}`,{method:"PATCH",headers:headers(),body:JSON.stringify({auth_user_id:auth.user.id,last_login_at:new Date().toISOString()})});return{id:member.id,email:member.email,name:member.full_name,role:member.role};}
 async function checked(response:Response,label:string){if(!response.ok)throw new Error(`${label}: ${await response.text()}`);return response;}
 async function rows<T>(table:string,query:string){const{url}=config();const response=await checked(await fetch(`${url}/rest/v1/${table}?${query}`,{headers:headers(),cache:"no-store"}),`Lecture ${table}`);return await response.json() as T[];}
 

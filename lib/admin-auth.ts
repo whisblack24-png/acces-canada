@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export const ADMIN_COOKIE = "acces_canada_admin";
+export type AdminIdentity = { id:string; email:string; name:string; role:"owner"|"admin"|"manager"|"agent"|"viewer" };
+export const ownerIdentity:AdminIdentity={id:"owner",email:"",name:"Propriétaire Accès Canada",role:"owner"};
 
 const maxAgeSeconds = 60 * 60 * 8;
 
@@ -54,34 +56,39 @@ export function verifyAdminPassword(password: string) {
   return safeEqual(password, expected);
 }
 
-export function createAdminSessionValue() {
+export function createAdminSessionValue(identity:AdminIdentity=ownerIdentity) {
   const expiresAt = Date.now() + maxAgeSeconds * 1000;
-  const payload = encode(JSON.stringify({ role: "admin", expiresAt }));
+  const payload = encode(JSON.stringify({ role: "admin", expiresAt, identity }));
   return `${payload}.${sign(payload)}`;
 }
 
 export function verifyAdminSessionValue(session: string | undefined) {
+  return Boolean(parseAdminSessionValue(session));
+}
+
+export function parseAdminSessionValue(session: string | undefined):AdminIdentity|null {
   if (!session) {
-    return false;
+    return null;
   }
 
   const separator = session.lastIndexOf(".");
   if (separator <= 0) {
-    return verifyLegacySessionValue(session);
+    return verifyLegacySessionValue(session) ? ownerIdentity : null;
   }
 
   const payload = session.slice(0, separator);
   const signature = session.slice(separator + 1);
 
   if (!payload || !signature || !safeEqual(signature, sign(payload))) {
-    return false;
+    return null;
   }
 
   try {
-    const parsed = JSON.parse(decode(payload)) as { role?: string; expiresAt?: number };
-    return parsed.role === "admin" && Number(parsed.expiresAt) > Date.now();
+    const parsed = JSON.parse(decode(payload)) as { role?: string; expiresAt?: number; identity?:AdminIdentity };
+    if(parsed.role !== "admin" || Number(parsed.expiresAt) <= Date.now()) return null;
+    return parsed.identity || ownerIdentity;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -108,7 +115,9 @@ export async function isAdminAuthenticated() {
   return verifyAdminSessionValue(session);
 }
 
-export function setAdminSession(response: NextResponse) {
+export async function getAdminIdentity(){const store=await cookies();return parseAdminSessionValue(store.get(ADMIN_COOKIE)?.value);}
+
+export function setAdminSession(response: NextResponse, identity:AdminIdentity=ownerIdentity) {
   response.cookies.set(ADMIN_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
@@ -118,7 +127,7 @@ export function setAdminSession(response: NextResponse) {
     expires: new Date(0),
   });
 
-  response.cookies.set(ADMIN_COOKIE, createAdminSessionValue(), {
+  response.cookies.set(ADMIN_COOKIE, createAdminSessionValue(identity), {
     httpOnly: true,
     sameSite: "lax",
     secure: shouldUseSecureCookie(),
