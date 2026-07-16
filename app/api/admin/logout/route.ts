@@ -1,9 +1,11 @@
 ﻿import { NextResponse } from "next/server";
 import { clearAdminSession } from "@/lib/admin-auth";
+import { createAuditLog } from "@/lib/platform-v2";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(request: Request) {
+  await createAuditLog({ action:"logout", entityType:"admin_session", summary:"Déconnexion administrateur", userAgent:request.headers.get("user-agent")||undefined }).catch((error)=>console.error("[audit] déconnexion",error));
   const response = clearAdminSession(NextResponse.json({ message: "Déconnexion réussie." }));
   const secure = process.env.ADMIN_COOKIE_SECURE === "false" ? "" : " Secure;";
 

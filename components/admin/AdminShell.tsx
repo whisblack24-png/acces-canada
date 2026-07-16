@@ -3,8 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, CalendarCheck, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarCheck, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
 import { brand } from "@/lib/site";
+import { AdminCommandCenter } from "@/components/admin/AdminCommandCenter";
 
 type AdminNavItem = {
   label: string;
@@ -17,6 +18,7 @@ const adminNav: AdminNavItem[] = [
   { label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
   { label: "Clients", href: "/admin/clients", icon: UsersRound },
   { label: "Tâches et rappels", href: "/admin/suivi", icon: ListTodo },
+  { label: "Journal d’activité", href: "/admin/activite", icon: Activity },
   { label: "Rendez-vous", href: "/admin/rendez-vous", icon: CalendarCheck },
   { label: "Documents", href: "/admin/documents", icon: FileText },
   { label: "Rapports", href: "/admin/rapports", icon: BarChart3 },
@@ -80,6 +82,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="lg:pl-72">
+        <header className="sticky top-0 z-30 hidden items-center border-b border-navy/10 bg-ivory/92 px-10 py-4 backdrop-blur-xl lg:flex"><AdminCommandCenter /></header>
         <header className="sticky top-0 z-30 border-b border-navy/10 bg-ivory/90 px-5 py-4 backdrop-blur-xl lg:hidden">
           <div className="flex items-center justify-between">
             <Link href="/admin" className="font-black">
@@ -89,6 +92,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               Sortir
             </button>
           </div>
+          <div className="mt-4"><AdminCommandCenter /></div>
           <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
             {adminNav
               .filter((item) => !item.disabled)

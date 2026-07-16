@@ -1,13 +1,14 @@
 ﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, CreditCard, Download, FileCheck2, FileText, Mail, MapPin, MessageSquare, Phone } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, CreditCard, FileCheck2, FileText, Mail, MapPin, MessageSquare, Phone } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ClientDossierActions } from "@/components/admin/ClientDossierActions";
 import { ClientProductionActions } from "@/components/admin/ClientProductionActions";
 import { ClientUploadedDocumentsAdmin } from "@/components/admin/ClientUploadedDocumentsAdmin";
 import { ClientQuestionnaires } from "@/components/admin/ClientQuestionnaires";
 import { CaseProgressManager } from "@/components/admin/CaseProgressManager";
+import { GeneratedDocumentVersions } from "@/components/admin/GeneratedDocumentVersions";
 import { ClientTimeline } from "@/components/admin/ClientTimeline";
 import { ClientWorkflowManager } from "@/components/admin/ClientWorkflowManager";
 import { SecureMessages } from "@/components/client/SecureMessages";
@@ -178,27 +179,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
             </Panel>
 
             <Panel title="Documents générés par Accès Canada" icon={<FileText className="h-5 w-5" />}>
-              {generatedDocuments.length ? (
-                <div className="space-y-3">
-                  {generatedDocuments.map((document) => (
-                    <a
-                      key={document.id}
-                      href={`/api/admin/documents/${document.id}/download`}
-                      className="flex items-center justify-between gap-3 rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/72 transition hover:bg-gold/15"
-                    >
-                      <span>
-                        <span className="block font-black text-navy">{document.document_label}</span>
-                        <span className="mt-1 block text-xs text-navy/42">
-                          {formatDateFr(document.created_at)}
-                        </span>
-                      </span>
-                      <Download className="h-4 w-4" />
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun document généré pour ce client.</p>
-              )}
+              <GeneratedDocumentVersions documents={generatedDocuments} />
             </Panel>
           </div>
         </section>

@@ -42,6 +42,13 @@ export function ClientUploadedDocumentsAdmin({ clientId, documents }: { clientId
     setFeedback("Document supprimé du dossier actif."); router.refresh();
   }
 
+  async function restore(document: ClientUploadedDocument) {
+    if (!window.confirm(`Restaurer la version ${document.version} de ${document.file_name} ? La version active sera archivée.`)) return;
+    const response = await fetch(`/api/admin/client-uploads/${document.id}/restore?clientId=${clientId}`, { method: "POST" });
+    if (!response.ok) { setFeedback("Impossible de restaurer cette version."); return; }
+    setFeedback(`Version ${document.version} restaurée.`); router.refresh();
+  }
+
   return <div className="space-y-6">
     <div className="grid gap-3 sm:grid-cols-3">
       <Metric value={active.length} label="documents actifs" />
@@ -70,7 +77,7 @@ export function ClientUploadedDocumentsAdmin({ clientId, documents }: { clientId
 
     <div><h3 className="mb-3 flex items-center gap-2 font-black text-navy"><Check className="h-4 w-4 text-emerald-600" /> État du dossier documentaire</h3><div className="grid gap-2 md:grid-cols-2">{DOCUMENT_CATEGORIES.map((item) => { const count = active.filter((doc) => doc.category === item.value).length; return <div key={item.value} className={`flex items-center justify-between rounded-2xl p-4 ${count ? "bg-emerald-50 text-emerald-900" : "bg-canada/5 text-navy/60"}`}><span className="font-bold">{item.label}</span><span className={`rounded-full px-3 py-1 text-xs font-black ${count ? "bg-emerald-100" : "bg-canada/10 text-canada"}`}>{count ? `${count} reçu${count > 1 ? "s" : ""}` : "Manquant"}</span></div>; })}</div></div>
 
-    {documents.some((item) => item.status !== "active") ? <details className="rounded-2xl border border-navy/10 p-4"><summary className="flex cursor-pointer list-none items-center gap-2 font-black text-navy/65"><History className="h-4 w-4" /> Historique des versions ({documents.filter((item) => item.status !== "active").length})</summary><div className="mt-3 space-y-2">{documents.filter((item) => item.status !== "active").map((item) => <div key={item.id} className="flex justify-between rounded-xl bg-ivory p-3 text-sm text-navy/55"><span>{item.file_name} · v{item.version}</span><span>{item.status === "replaced" ? "Remplacé" : "Supprimé"}</span></div>)}</div></details> : null}
+    {documents.some((item) => item.status !== "active") ? <details className="rounded-2xl border border-navy/10 p-4"><summary className="flex cursor-pointer list-none items-center gap-2 font-black text-navy/65"><History className="h-4 w-4" /> Historique des versions ({documents.filter((item) => item.status !== "active").length})</summary><div className="mt-3 space-y-2">{documents.filter((item) => item.status !== "active").map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-ivory p-3 text-sm text-navy/55"><span>{item.file_name} · v{item.version} · {item.status === "replaced" ? "Remplacé" : "Supprimé"}</span>{item.status === "replaced" ? <button type="button" onClick={() => restore(item)} className="shrink-0 rounded-full bg-navy px-3 py-2 text-xs font-black text-white">Restaurer</button> : null}</div>)}</div></details> : null}
   </div>;
 }
 

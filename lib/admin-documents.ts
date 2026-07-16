@@ -10,6 +10,9 @@ export type GeneratedDocument = {
   document_label: string;
   file_name: string;
   included_information: DocumentGenerationOptions;
+  version: number;
+  status: "active" | "replaced" | "deleted";
+  replaced_document_id: string | null;
 };
 
 export type GeneratedDocumentInput = {
@@ -124,6 +127,9 @@ export async function getGeneratedDocument(id: string) {
 
 export async function createGeneratedDocument(input: GeneratedDocumentInput) {
   const { url, key, table } = supabaseConfig();
+  const previousResponse = await fetch(`${url}/rest/v1/${table}?client_id=eq.${encodeURIComponent(input.client_id)}&document_type=eq.${encodeURIComponent(input.document_type)}&status=eq.active&select=id,version&order=created_at.desc&limit=1`, { headers: headers(key), cache: "no-store" });
+  if (!previousResponse.ok) throw await supabaseError("Lecture version document", previousResponse);
+  const previous = ((await previousResponse.json()) as { id:string; version:number }[])[0];
   const response = await fetch(`${url}/rest/v1/${table}`, {
     method: "POST",
     headers: { ...headers(key), Prefer: "return=representation" },
@@ -134,6 +140,9 @@ export async function createGeneratedDocument(input: GeneratedDocumentInput) {
       document_label: documentLabels[input.document_type],
       file_name: input.file_name,
       included_information: input.included_information,
+      version: Number(previous?.version || 0) + 1,
+      status: "active",
+      replaced_document_id: previous?.id || null,
     }),
   });
 
@@ -141,17 +150,34 @@ export async function createGeneratedDocument(input: GeneratedDocumentInput) {
     throw await supabaseError("Création document", response);
   }
 
-  return ((await response.json()) as GeneratedDocument[])[0];
+  const created = ((await response.json()) as GeneratedDocument[])[0];
+  if (previous) {
+    const archived = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(previous.id)}`, { method:"PATCH", headers:headers(key), body:JSON.stringify({status:"replaced"}) });
+    if (!archived.ok) throw await supabaseError("Archivage version document", archived);
+  }
+  return created;
 }
 
 export async function deleteGeneratedDocument(id: string) {
   const { url, key, table } = supabaseConfig();
   const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
-    method: "DELETE",
+    method: "PATCH",
     headers: headers(key),
+    body: JSON.stringify({ status: "deleted" }),
   });
 
   if (!response.ok) {
     throw await supabaseError("Suppression document", response);
   }
+}
+
+export async function restoreGeneratedDocument(id:string){
+  const {url,key,table}=supabaseConfig();
+  const targetResponse=await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&status=eq.replaced&select=*&limit=1`,{headers:headers(key),cache:"no-store"});
+  if(!targetResponse.ok)throw await supabaseError("Lecture version générée",targetResponse);
+  const target=((await targetResponse.json()) as GeneratedDocument[])[0];if(!target)throw new Error("Version générée introuvable.");
+  const activeResponse=await fetch(`${url}/rest/v1/${table}?client_id=eq.${encodeURIComponent(target.client_id)}&document_type=eq.${encodeURIComponent(target.document_type)}&status=eq.active&select=id`,{headers:headers(key),cache:"no-store"});
+  if(!activeResponse.ok)throw await supabaseError("Lecture document actif",activeResponse);const active=(await activeResponse.json()) as {id:string}[];
+  if(active.length){const archived=await fetch(`${url}/rest/v1/${table}?id=in.(${active.map((item)=>item.id).join(",")})`,{method:"PATCH",headers:headers(key),body:JSON.stringify({status:"replaced"})});if(!archived.ok)throw await supabaseError("Archivage document actif",archived)}
+  const restored=await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify({status:"active"})});if(!restored.ok)throw await supabaseError("Restauration document généré",restored);return((await restored.json()) as GeneratedDocument[])[0];
 }

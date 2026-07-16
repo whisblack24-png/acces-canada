@@ -9,6 +9,7 @@ import {
   FileSignature,
   FileText,
   FolderKanban,
+  History,
   UploadCloud,
 } from "lucide-react";
 import { ClientPanel, ClientShell } from "@/components/client/ClientShell";
@@ -31,6 +32,7 @@ import {
 } from "@/lib/production-workflow";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
 import { caseSteps } from "@/lib/questionnaire-definitions";
+import { listTimeline } from "@/lib/crm";
 
 export const metadata: Metadata = {
   title: "Tableau de bord client",
@@ -52,6 +54,7 @@ export default async function ClientDashboardPage() {
     messages,
     questionnaires,
     caseProgress,
+    timeline,
   ] = await Promise.all([
     listClientUploads(client.id).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
@@ -61,6 +64,7 @@ export default async function ClientDashboardPage() {
     listClientMessages(client.id).catch(() => []),
     listQuestionnaires(client.id).catch(() => []),
     listCaseProgress(client.id).catch(() => []),
+    listTimeline(client.id).catch(() => []),
   ]);
   const completedSteps = caseProgress.filter(
     (step) => step.status === "completed" || step.status === "not_applicable",
@@ -78,6 +82,7 @@ export default async function ClientDashboardPage() {
       appointment.status === "confirmed" &&
       new Date(appointment.starts_at) >= new Date(),
   );
+  const availableDocuments = documents.filter((document) => !document.status || document.status === "active");
 
   return (
     <ClientShell>
@@ -109,7 +114,7 @@ export default async function ClientDashboardPage() {
           <Stat label="Référence" value={client.file_reference || "À créer"} />
           <Stat
             label="Documents"
-            value={`${uploads.length} envoyés / ${documents.length} générés`}
+            value={`${uploads.length} envoyés / ${availableDocuments.length} générés`}
           />
         </section>
 
@@ -268,6 +273,12 @@ export default async function ClientDashboardPage() {
           </div>
         </ClientPanel>
 
+        <ClientPanel title="Historique de mon dossier" icon={<History className="h-5 w-5" />}>
+          <ol className="relative ml-2 border-l-2 border-gold/40 pl-6">
+            {timeline.length ? timeline.slice(0, 10).map((event) => <li key={event.id} className="relative mb-5 last:mb-0"><span className="absolute -left-[1.95rem] top-1 h-3 w-3 rounded-full bg-gold ring-4 ring-white"/><p className="text-xs font-black uppercase tracking-wider text-canada">{new Date(event.created_at).toLocaleString("fr-CA")}</p><strong className="mt-1 block text-navy">{event.title}</strong>{event.description ? <p className="mt-1 text-sm text-navy/58">{event.description}</p> : null}</li>) : <li className="text-sm font-bold text-navy/45">L’historique apparaîtra ici à mesure que votre dossier avancera.</li>}
+          </ol>
+        </ClientPanel>
+
         <div className="grid gap-6 xl:grid-cols-2">
           <ClientPanel
             title="Signatures électroniques"
@@ -332,8 +343,8 @@ export default async function ClientDashboardPage() {
             icon={<FileText className="h-5 w-5" />}
           >
             <div className="space-y-3">
-              {documents.length ? (
-                documents.slice(0, 6).map((document) => (
+              {availableDocuments.length ? (
+                availableDocuments.slice(0, 6).map((document) => (
                   <a
                     key={document.id}
                     href={`/api/client/generated-documents/${document.id}/download`}

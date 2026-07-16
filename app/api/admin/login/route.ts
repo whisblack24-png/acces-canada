@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminConfigurationError, setAdminSession, verifyAdminPassword } from "@/lib/admin-auth";
 import { checkRateLimit, requestIp } from "@/lib/rate-limit";
+import { createAuditLog } from "@/lib/platform-v2";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
     }
 
     console.info("[admin-login] Connexion administrateur réussie.");
+    await createAuditLog({ action:"login", entityType:"admin_session", summary:"Connexion administrateur réussie", ipAddress:requestIp(request), userAgent:request.headers.get("user-agent")||undefined }).catch((error)=>console.error("[audit] connexion",error));
     return setAdminSession(NextResponse.json({ message: "Connexion réussie." }));
   } catch (error) {
     console.error("[admin-login] Erreur inattendue:", error);

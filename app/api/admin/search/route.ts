@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"; import { isAdminAuthenticated } from "@/lib/admin-auth"; import { universalSearch } from "@/lib/platform-v2";
+export async function GET(request:Request){if(!(await isAdminAuthenticated()))return NextResponse.json({error:"Non autorisé."},{status:401});const query=new URL(request.url).searchParams.get("q")||"";return NextResponse.json(await universalSearch(query));}

@@ -336,6 +336,24 @@ export async function replaceClientFile(clientId: string, previousId: string, fi
   return replacement;
 }
 
+export async function restoreClientFileVersion(clientId: string, uploadId: string) {
+  const { url, key, uploadsTable } = config();
+  const targetResponse = await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}&status=eq.replaced&select=*&limit=1`, { headers: headers(key), cache: "no-store" });
+  if (!targetResponse.ok) await fail("Lecture de la version à restaurer", targetResponse);
+  const target = ((await targetResponse.json()) as ClientUploadedDocument[])[0];
+  if (!target) throw new Error("Version restaurable introuvable.");
+  const currentResponse = await fetch(`${url}/rest/v1/${uploadsTable}?client_id=eq.${encodeURIComponent(clientId)}&category=eq.${encodeURIComponent(target.category)}&status=eq.active&select=id`, { headers: headers(key), cache: "no-store" });
+  if (!currentResponse.ok) await fail("Lecture de la version active", currentResponse);
+  const current = (await currentResponse.json()) as { id:string }[];
+  if (current.length) {
+    const archived = await fetch(`${url}/rest/v1/${uploadsTable}?id=in.(${current.map((item)=>item.id).join(",")})`, { method:"PATCH", headers:{...headers(key),Prefer:"return=minimal"}, body:JSON.stringify({status:"replaced",updated_at:new Date().toISOString()}) });
+    if (!archived.ok) await fail("Archivage de la version active", archived);
+  }
+  const restored = await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(target.id)}`, { method:"PATCH", headers:{...headers(key),Prefer:"return=representation"}, body:JSON.stringify({status:"active",deleted_at:null,updated_at:new Date().toISOString(),uploaded_by:"Équipe Accès Canada · restauration"}) });
+  if (!restored.ok) await fail("Restauration de la version", restored);
+  return ((await restored.json()) as ClientUploadedDocument[])[0];
+}
+
 export async function listClientMessages(clientId: string) {
   const { url, key, messagesTable } = config();
   const response = await fetch(
