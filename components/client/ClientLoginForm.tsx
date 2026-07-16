@@ -50,7 +50,7 @@ export function ClientLoginForm() {
   }
 
   return (
-    <div className="min-w-0 w-full max-w-xl overflow-hidden rounded-[2rem] bg-white p-5 shadow-premium sm:p-6 md:p-8">
+    <div className="w-[calc(100vw-2rem)] min-w-0 max-w-xl overflow-hidden rounded-[2rem] bg-white p-5 shadow-premium sm:w-full sm:p-6 md:p-8">
       <div className="mb-7 flex items-center justify-between gap-4">
         <Image src="/images/logo.png" alt="Accès Canada" width={58} height={58} className="h-14 w-14 rounded-2xl" />
         <Link
