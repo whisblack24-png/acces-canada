@@ -40,7 +40,7 @@ export function LoginForm() {
 
   return (
     <form onSubmit={submit} className="mt-8 space-y-5">
-      <label className="block text-sm font-bold text-navy/72">Courriel professionnel <span className="font-normal text-navy/40">(employés)</span><span className="relative mt-2 block"><Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-navy/30"/><input name="email" type="email" autoComplete="username" className="w-full rounded-2xl border border-navy/10 bg-ivory py-4 pl-12 pr-4 text-navy outline-none transition focus:border-gold" placeholder="nom@accescanada.ca"/></span></label>
+      <label className="block text-sm font-bold text-navy/72">Courriel professionnel <span className="font-normal text-navy/40">(facultatif)</span><span className="relative mt-2 block"><Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-navy/30"/><input name="email" type="email" autoComplete="username" className="w-full rounded-2xl border border-navy/10 bg-ivory py-4 pl-12 pr-4 text-navy outline-none transition focus:border-gold" placeholder="Réservé aux comptes employés"/></span><span className="mt-2 block text-xs font-semibold text-navy/45">Pour l’accès administrateur principal, vous pouvez laisser ce champ vide.</span></label>
       <label className="block text-sm font-bold text-navy/72">
         Mot de passe
         <span className="relative mt-2 block">

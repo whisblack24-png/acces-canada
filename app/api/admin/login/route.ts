@@ -20,7 +20,9 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as { email?:string; password?: string };
     const email=String(body.email||"").trim().toLowerCase();
-    const identity=email?await authenticateStaffMember(email,String(body.password||"")):verifyAdminPassword(String(body.password||""))?ownerIdentity:null;
+    const password=String(body.password||"");
+    const staffIdentity=email?await authenticateStaffMember(email,password):null;
+    const identity=staffIdentity||(verifyAdminPassword(password)?ownerIdentity:null);
     if (!identity) {
       console.warn("[admin-login] Mot de passe administrateur refusé.");
       return NextResponse.json({ message: "Mot de passe administrateur incorrect." }, { status: 401 });
