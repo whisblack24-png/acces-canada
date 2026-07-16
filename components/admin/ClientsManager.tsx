@@ -155,8 +155,8 @@ export function ClientsManager({ initialClients, initialFeedback = "" }: { initi
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="min-w-0 rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">CRM Clients</p>
@@ -238,7 +238,7 @@ export function ClientsManager({ initialClients, initialFeedback = "" }: { initi
         </div>
       </section>
 
-      <aside className="space-y-6">
+      <aside className="min-w-0 space-y-6">
         <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl font-black text-navy">{editingId ? "Modifier le client" : "Ajouter un client"}</h2>

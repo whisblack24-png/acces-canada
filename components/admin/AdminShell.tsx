@@ -35,7 +35,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-ivory text-navy">
+    <div className="min-h-screen overflow-x-hidden bg-ivory text-navy">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-navy/10 bg-navy text-white lg:block">
         <div className="flex h-full flex-col p-5">
           <Link href="/admin" className="flex items-center gap-3 rounded-3xl bg-white/8 p-4">
@@ -81,7 +81,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="lg:pl-72">
+      <div className="min-w-0 lg:pl-72">
         <header className="sticky top-0 z-30 hidden items-center border-b border-navy/10 bg-ivory/92 px-10 py-4 backdrop-blur-xl lg:flex"><AdminCommandCenter /></header>
         <header className="sticky top-0 z-30 border-b border-navy/10 bg-ivory/90 px-5 py-4 backdrop-blur-xl lg:hidden">
           <div className="flex items-center justify-between">
@@ -110,7 +110,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </nav>
         </header>
 
-        <main className="px-5 py-8 md:px-8 lg:px-10">{children}</main>
+        <main className="min-w-0 px-5 py-8 md:px-8 lg:px-10">{children}</main>
       </div>
     </div>
   );
