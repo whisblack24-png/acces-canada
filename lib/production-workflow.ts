@@ -1,6 +1,6 @@
 import { getClient, updateClient, type AdminClient, type ClientInput } from "@/lib/admin-data";
 import { documentLabels, type ClientDocumentType } from "@/lib/pdf-documents";
-import { sendSmtpMail } from "@/lib/smtp";
+import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
 import { formatMoney } from "@/lib/format";
 import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
 
@@ -100,8 +100,7 @@ export async function notifyClient(client: AdminClient, subject: string, message
   await sendSmtpMail({
     host,
     port,
-    secure: String(process.env.SMTP_SECURE || "true") === "true",
-    startTls: String(process.env.SMTP_STARTTLS || "false") === "true",
+    ...smtpSecurityForPort(port),
     user,
     pass,
     from,

@@ -9,13 +9,14 @@ import { listGeneratedDocuments } from "@/lib/admin-documents";
 import { listAllClientMessages, listAllClientUploads } from "@/lib/client-portal";
 import { listAllClientPayments } from "@/lib/production-workflow";
 import { buildAdminDashboard } from "@/lib/admin-dashboard";
+import { listAllReminders, listAllTasks } from "@/lib/crm";
 
 export const metadata: Metadata = { title: "Tableau de bord administrateur" };
 
 export default async function AdminDashboardPage() {
   if (!(await isAdminAuthenticated())) redirect("/admin/login");
-  const [clients, appointments, documents, uploads, messages, payments] = await Promise.all([
-    listClients(), listAppointments(), listGeneratedDocuments(), listAllClientUploads(), listAllClientMessages(), listAllClientPayments(),
+  const [clients, appointments, documents, uploads, messages, payments, tasks, reminders] = await Promise.all([
+    listClients(), listAppointments(), listGeneratedDocuments(), listAllClientUploads(), listAllClientMessages(), listAllClientPayments(), listAllTasks(), listAllReminders(),
   ]);
-  return <AdminShell><PremiumAdminDashboard data={buildAdminDashboard({ clients, appointments, documents, uploads, messages, payments })} /></AdminShell>;
+  return <AdminShell><PremiumAdminDashboard data={buildAdminDashboard({ clients, appointments, documents, uploads, messages, payments })} tasks={tasks} reminders={reminders} /></AdminShell>;
 }

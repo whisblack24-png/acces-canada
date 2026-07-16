@@ -8,6 +8,8 @@ import { ClientProductionActions } from "@/components/admin/ClientProductionActi
 import { ClientUploadedDocumentsAdmin } from "@/components/admin/ClientUploadedDocumentsAdmin";
 import { ClientQuestionnaires } from "@/components/admin/ClientQuestionnaires";
 import { CaseProgressManager } from "@/components/admin/CaseProgressManager";
+import { ClientTimeline } from "@/components/admin/ClientTimeline";
+import { ClientWorkflowManager } from "@/components/admin/ClientWorkflowManager";
 import { SecureMessages } from "@/components/client/SecureMessages";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient, serviceLabels, statusLabels } from "@/lib/admin-data";
@@ -19,6 +21,7 @@ import { formatMoney } from "@/lib/format";
 import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
+import { listClientReminders, listClientTasks, listTimeline } from "@/lib/crm";
 
 export const metadata: Metadata = {
   title: "Dossier client",
@@ -46,7 +49,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
   const received = client.documents_received || [];
   const missing = client.documents_missing || [];
-  const [uploadedDocuments, generatedDocuments, appointments, payments, messages, questionnaires, caseProgress] = await Promise.all([
+  const [uploadedDocuments, generatedDocuments, appointments, payments, messages, questionnaires, caseProgress, timeline, tasks, reminders] = await Promise.all([
     listClientUploads(client.id, true).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
     listAppointmentsForEmail(client.email).catch(() => []),
@@ -54,6 +57,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
     listClientMessages(client.id).catch(() => []),
     listQuestionnaires(client.id).catch(() => []),
     listCaseProgress(client.id).catch(() => []),
+    listTimeline(client.id).catch(() => []), listClientTasks(client.id).catch(() => []), listClientReminders(client.id).catch(() => []),
   ]);
   const history = client.action_history?.length
     ? client.action_history
@@ -141,6 +145,10 @@ export default async function ClientDossierPage({ params }: PageProps) {
                 ))}
               </div>
             </Panel>
+
+            <Panel title="Chronologie complète" icon={<Clock3 className="h-5 w-5" />}><ClientTimeline events={timeline} /></Panel>
+
+            <Panel title="Tâches et rappels" icon={<CalendarClock className="h-5 w-5" />}><ClientWorkflowManager clientId={client.id} initialTasks={tasks} initialReminders={reminders} /></Panel>
 
             <Panel title="Questionnaires intelligents" icon={<FileText className="h-5 w-5" />}>
               <ClientQuestionnaires clientId={client.id} initialRows={questionnaires} />

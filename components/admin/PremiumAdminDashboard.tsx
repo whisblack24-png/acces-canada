@@ -6,16 +6,18 @@ import { useRouter } from "next/navigation";
 import { BarChart3, Bell, CalendarDays, CheckCircle2, CircleDollarSign, Clock3, FileCheck2, FilePlus2, FileText, FolderClock, MessageSquare, Plus, Search, TrendingUp, UserPlus } from "lucide-react";
 import type { buildAdminDashboard } from "@/lib/admin-dashboard";
 import { formatMoney } from "@/lib/format";
+import { buildCrmStats, type ClientReminder, type ClientTask } from "@/lib/crm";
 
 type DashboardData = ReturnType<typeof buildAdminDashboard>;
 type ChartMetric = "revenue" | "appointments" | "clients";
 
-export function PremiumAdminDashboard({ data }: { data: DashboardData }) {
+export function PremiumAdminDashboard({ data, tasks, reminders }: { data: DashboardData; tasks: ClientTask[]; reminders: ClientReminder[] }) {
   const [query, setQuery] = useState("");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("revenue");
   const router = useRouter();
   useEffect(() => { const timer = window.setInterval(() => router.refresh(), 60_000); return () => window.clearInterval(timer); }, [router]);
   const results = useMemo(() => query.trim().length < 2 ? [] : data.searchItems.filter((item) => item.search.includes(query.toLowerCase().trim())).slice(0, 8), [data.searchItems, query]);
+  const crm = buildCrmStats(tasks, reminders);
   const metrics = [
     ["CA aujourd’hui", `${formatMoney(data.metrics.revenueDay)} $`, CircleDollarSign], ["CA cette semaine", `${formatMoney(data.metrics.revenueWeek)} $`, TrendingUp],
     ["CA ce mois", `${formatMoney(data.metrics.revenueMonth)} $`, BarChart3], ["CA cette année", `${formatMoney(data.metrics.revenueYear)} $`, CircleDollarSign],
@@ -24,6 +26,7 @@ export function PremiumAdminDashboard({ data }: { data: DashboardData }) {
     ["Dossiers terminés", data.metrics.completedCases, CheckCircle2], ["Paiements reçus", data.metrics.paymentsReceived, CircleDollarSign],
     ["Factures générées", data.metrics.invoices, FileText], ["Documents à valider", data.metrics.pendingDocuments, FileCheck2],
     ["Messages non lus", data.metrics.unreadMessages, Bell],
+    ["Tâches ouvertes", crm.openTasks, FileCheck2], ["Rappels échus", crm.dueReminders, Bell],
   ] as const;
 
   return <div className="space-y-7">
@@ -45,8 +48,11 @@ export function PremiumAdminDashboard({ data }: { data: DashboardData }) {
       <Panel title="Calendrier des rendez-vous" icon={<CalendarDays className="h-5 w-5" />}><DashboardCalendar appointments={data.calendar} /></Panel>
       <Panel title="Activité récente" icon={<Clock3 className="h-5 w-5" />}><div className="max-h-[38rem] space-y-1 overflow-y-auto pr-2">{data.activities.map((activity) => <Link key={activity.id} href={activity.clientId ? `/admin/clients/${activity.clientId}` : "/admin"} className="flex gap-4 rounded-2xl p-3 transition hover:bg-ivory"><span className="mt-1 h-3 w-3 shrink-0 rounded-full bg-gold ring-4 ring-gold/15" /><span><strong className="block text-sm text-navy">{activity.label}</strong><span className="mt-1 block text-sm text-navy/55">{activity.detail}</span><small className="mt-1 block font-bold text-navy/30">{new Date(activity.at).toLocaleString("fr-CA")}</small></span></Link>)}</div></Panel>
     </section>
+    <section className="grid gap-6 lg:grid-cols-2"><Panel title="Tâches prioritaires" icon={<FileCheck2 className="h-5 w-5" />}><OperationalList rows={tasks.filter((item)=>!["completed","cancelled"].includes(item.status)).slice(0,6).map((item)=>({id:item.id,title:item.title,detail:`${item.priority} · ${item.due_at?new Date(item.due_at).toLocaleString("fr-CA"):"sans échéance"}`,href:`/admin/clients/${item.client_id}`}))}/></Panel><Panel title="Prochains rappels" icon={<Bell className="h-5 w-5" />}><OperationalList rows={reminders.filter((item)=>item.status==="scheduled").slice(0,6).map((item)=>({id:item.id,title:item.title,detail:new Date(item.remind_at).toLocaleString("fr-CA"),href:`/admin/clients/${item.client_id}`}))}/></Panel></section>
   </div>;
 }
+
+function OperationalList({rows}:{rows:{id:string;title:string;detail:string;href:string}[]}){return rows.length?<div className="space-y-2">{rows.map((row)=><Link key={row.id} href={row.href} className="flex items-center justify-between rounded-2xl bg-ivory p-4 hover:bg-gold/15"><span><strong className="block">{row.title}</strong><small className="text-navy/45">{row.detail}</small></span><span aria-hidden>→</span></Link>)}</div>:<p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/50">Aucun élément à traiter.</p>}
 
 function QuickActions() { const actions = [["Nouveau client","/admin/clients",UserPlus],["Nouveau rendez-vous","/admin/rendez-vous",Plus],["Rechercher un client","/admin/clients",Search],["Créer une facture","/admin/documents/generation",FilePlus2],["Envoyer un message","/admin/clients",MessageSquare]] as const; return <div className="flex max-w-2xl flex-wrap gap-2">{actions.map(([label,href,Icon]) => <Link key={label} href={href} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-gold hover:text-navy"><Icon className="h-4 w-4" />{label}</Link>)}</div>; }
 function Panel({ title, icon, children }: { title:string; icon:React.ReactNode; children:React.ReactNode }) { return <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7"><header className="mb-6 flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-gold/18">{icon}</span><h2 className="font-display text-2xl font-black text-navy">{title}</h2></header>{children}</section>; }

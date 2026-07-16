@@ -24,6 +24,11 @@ type SmtpOptions = {
   }[];
 };
 
+/** Le port 465 utilise TLS implicite; les ports de soumission utilisent STARTTLS. */
+export function smtpSecurityForPort(port: number) {
+  return { secure: port === 465, startTls: port !== 465 };
+}
+
 const SMTP_TIMEOUT_MS = 15_000;
 
 function attachTimeout<T extends net.Socket>(socket: T): T {

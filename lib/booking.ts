@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import QRCode from "qrcode";
-import { sendSmtpMail } from "@/lib/smtp";
+import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
 import { brand } from "@/lib/site";
 import { appointmentConfirmationEmailHtml } from "@/lib/appointment-confirmation-email";
 import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
@@ -554,7 +554,7 @@ export async function sendAppointmentConfirmationEmail(appointment: Appointment)
   await sendSmtpMail({
     host: host!,
     port,
-    secure: process.env.SMTP_SECURE === "true" || (process.env.SMTP_SECURE == null && port === 465),
+    ...smtpSecurityForPort(port),
     startTls: port !== 465 && process.env.SMTP_STARTTLS !== "false",
     user: user!,
     pass: pass!,
@@ -620,7 +620,7 @@ export async function sendAppointmentReminderEmail(appointment: Appointment) {
   await sendSmtpMail({
     host,
     port,
-    secure: process.env.SMTP_SECURE === "true" || (process.env.SMTP_SECURE == null && port === 465),
+    ...smtpSecurityForPort(port),
     startTls: port !== 465 && process.env.SMTP_STARTTLS !== "false",
     user,
     pass,

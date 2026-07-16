@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, CalendarCheck, FileText, LayoutDashboard, LogOut, UsersRound, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarCheck, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
 import { brand } from "@/lib/site";
 
 type AdminNavItem = {
@@ -16,6 +16,7 @@ type AdminNavItem = {
 const adminNav: AdminNavItem[] = [
   { label: "Tableau de bord", href: "/admin", icon: LayoutDashboard },
   { label: "Clients", href: "/admin/clients", icon: UsersRound },
+  { label: "Tâches et rappels", href: "/admin/suivi", icon: ListTodo },
   { label: "Rendez-vous", href: "/admin/rendez-vous", icon: CalendarCheck },
   { label: "Documents", href: "/admin/documents", icon: FileText },
   { label: "Rapports", href: "/admin/rapports", icon: BarChart3 },

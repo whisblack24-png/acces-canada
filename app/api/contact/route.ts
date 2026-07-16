@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { brand } from "@/lib/site";
-import { sendSmtpMail } from "@/lib/smtp";
+import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
 
 export const runtime = "nodejs";
 
@@ -126,7 +126,7 @@ async function sendEmails(payload: ReturnType<typeof getPayload>, submittedAt: s
   const baseMail = {
     host: smtpHost,
     port: smtpPort,
-    secure: process.env.SMTP_SECURE === "true" || smtpPort === 465,
+    ...smtpSecurityForPort(smtpPort),
     startTls: process.env.SMTP_STARTTLS !== "false",
     user: smtpUser,
     pass: smtpPass,

@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { createClientCode } from "@/lib/client-auth";
 import { createLoginCode, findClientByEmail } from "@/lib/client-portal";
-import { sendSmtpMail } from "@/lib/smtp";
+import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
 import { brand } from "@/lib/site";
 import { checkRateLimit, requestIp } from "@/lib/rate-limit";
 
@@ -23,7 +23,7 @@ async function sendCode(email: string, name: string, code: string) {
   await sendSmtpMail({
     host: smtpHost,
     port: smtpPort,
-    secure: process.env.SMTP_SECURE === "true" || smtpPort === 465,
+    ...smtpSecurityForPort(smtpPort),
     startTls: process.env.SMTP_STARTTLS !== "false",
     user: smtpUser,
     pass: smtpPass,
