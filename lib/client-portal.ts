@@ -304,6 +304,21 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
   return record;
 }
 
+export async function deleteClientStorageFiles(filePaths: string[]) {
+  const { url, key, bucket } = config();
+  const failures: string[] = [];
+
+  for (const filePath of [...new Set(filePaths.filter(Boolean))]) {
+    const response = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(filePath)}`, {
+      method: "DELETE",
+      headers: supabaseAuthHeaders(key),
+    });
+    if (!response.ok && response.status !== 404) failures.push(filePath);
+  }
+
+  return failures;
+}
+
 export async function replaceClientFile(clientId: string, previousId: string, file: File, category: string, uploadedBy: string) {
   const { url, key, uploadsTable } = config();
   const previousResponse = await fetch(

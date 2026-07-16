@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { getAdminIdentity, isAdminAuthenticated } from "@/lib/admin-auth";
 import {
   adminErrorMessage,
   deleteClient,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin-data";
 import { formatMoney } from "@/lib/format";
 import { notifyStatusChanged } from "@/lib/production-workflow";
+import { deleteClientStorageFiles } from "@/lib/client-portal";
 
 export const runtime = "nodejs";
 
@@ -90,10 +91,21 @@ export async function DELETE(_request: Request, context: Context) {
   const { id } = await context.params;
 
   try {
-    await deleteClient(id);
-    return NextResponse.json({ message: "Client supprimé." });
+    const identity = await getAdminIdentity();
+    const deleted = await deleteClient(id, identity?.id || "administrateur");
+    const storageFailures = await deleteClientStorageFiles(deleted.uploaded_file_paths || []);
+    if (storageFailures.length) {
+      console.error("Nettoyage Storage incomplet après suppression client", {
+        clientId: id,
+        failedFileCount: storageFailures.length,
+      });
+    }
+    return NextResponse.json({ message: "Le client a été supprimé avec succès." });
   } catch (error) {
     logSupabaseError("Erreur suppression client", error);
-    return NextResponse.json({ message: `Impossible de supprimer le client. ${adminErrorMessage(error)}` }, { status: 500 });
+    return NextResponse.json(
+      { message: "La suppression du client n’a pas pu être terminée. Aucune donnée n’a été supprimée. Veuillez réessayer." },
+      { status: 500 },
+    );
   }
 }

@@ -374,16 +374,28 @@ export async function updateClient(id: string, input: ClientInput) {
   return ((await fallback.json()) as AdminClient[])[0];
 }
 
-export async function deleteClient(id: string) {
-  const { url, key, table } = supabaseConfig();
-  const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
-    method: "DELETE",
+export type DeletedClientResult = {
+  id: string;
+  full_name: string;
+  email: string;
+  file_reference: string | null;
+  uploaded_file_paths: string[];
+  deleted_at: string;
+};
+
+export async function deleteClient(id: string, actorId = "administrateur") {
+  const { url, key } = supabaseConfig();
+  const response = await fetch(`${url}/rest/v1/rpc/delete_admin_client_v2`, {
+    method: "POST",
     headers: headers(key),
+    body: JSON.stringify({ p_client_id: id, p_actor_id: actorId, p_actor_type: "staff" }),
   });
 
   if (!response.ok) {
     throw await supabaseError("Suppression client", response);
   }
+
+  return (await response.json()) as DeletedClientResult;
 }
 
 export function dashboardStats(clients: AdminClient[]) {

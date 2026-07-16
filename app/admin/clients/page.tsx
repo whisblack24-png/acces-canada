@@ -9,12 +9,13 @@ export const metadata: Metadata = {
   title: "Clients",
 };
 
-export default async function AdminClientsPage() {
+export default async function AdminClientsPage({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   if (!(await isAdminAuthenticated())) {
     redirect("/admin/login");
   }
 
   const clients = await listClients().catch(() => []);
+  const { deleted } = await searchParams;
 
   return (
     <AdminShell>
@@ -27,7 +28,7 @@ export default async function AdminClientsPage() {
           dossier et prépare les futures automatisations documentaires.
         </p>
       </section>
-        <ClientsManager initialClients={clients} />
+        <ClientsManager initialClients={clients} initialFeedback={deleted === "1" ? "Le client a été supprimé avec succès." : ""} />
       </div>
     </AdminShell>
   );

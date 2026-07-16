@@ -35,13 +35,14 @@ function arrayToLines(value: string[] | null | undefined) {
   return (value || []).join("\n");
 }
 
-export function ClientsManager({ initialClients }: { initialClients: AdminClient[] }) {
+export function ClientsManager({ initialClients, initialFeedback = "" }: { initialClients: AdminClient[]; initialFeedback?: string }) {
   const [clients, setClients] = useState(initialClients);
   const [form, setForm] = useState<ClientInput>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<AdminClient | null>(initialClients[0] || null);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState(initialFeedback);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
@@ -133,16 +134,24 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
   }
 
   async function remove(client: AdminClient) {
+    if (deletingId) return;
     if (!window.confirm(`Supprimer ${client.full_name} ?`)) return;
 
-    const response = await fetch(`/api/admin/clients/${client.id}`, { method: "DELETE", credentials: "include" });
-    if (!response.ok) {
-      setFeedback("Impossible de supprimer le client.");
-      return;
-    }
+    setDeletingId(client.id);
+    setFeedback("");
+    try {
+      const response = await fetch(`/api/admin/clients/${client.id}`, { method: "DELETE", credentials: "include" });
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        setFeedback(result.message || "La suppression du client n’a pas pu être terminée. Aucune donnée n’a été supprimée. Veuillez réessayer.");
+        return;
+      }
 
-    setFeedback("Client supprimé.");
-    await refresh();
+      setFeedback(result.message || "Le client a été supprimé avec succès.");
+      await refresh();
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -213,7 +222,13 @@ export function ClientsManager({ initialClients }: { initialClients: AdminClient
                   </Link>
                   <IconButton label="Aperçu" onClick={() => setSelected(client)} icon={<Eye className="h-4 w-4" />} />
                   <IconButton label="Modifier" onClick={() => edit(client)} icon={<Edit3 className="h-4 w-4" />} />
-                  <IconButton label="Supprimer" onClick={() => remove(client)} icon={<Trash2 className="h-4 w-4" />} danger />
+                  <IconButton
+                    label={deletingId === client.id ? "Suppression en cours" : "Supprimer"}
+                    onClick={() => remove(client)}
+                    icon={<Trash2 className={`h-4 w-4 ${deletingId === client.id ? "animate-pulse" : ""}`} />}
+                    danger
+                    disabled={deletingId !== null}
+                  />
                 </span>
               </div>
             ))
@@ -418,14 +433,15 @@ function Textarea({
   );
 }
 
-function IconButton({ label, onClick, icon, danger = false }: { label: string; onClick: () => void; icon: React.ReactNode; danger?: boolean }) {
+function IconButton({ label, onClick, icon, danger = false, disabled = false }: { label: string; onClick: () => void; icon: React.ReactNode; danger?: boolean; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
-      className={`grid h-9 w-9 place-items-center rounded-full transition ${
+      className={`grid h-9 w-9 place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-45 ${
         danger ? "bg-canada/10 text-canada hover:bg-canada hover:text-white" : "bg-navy/8 text-navy hover:bg-navy hover:text-white"
       }`}
     >

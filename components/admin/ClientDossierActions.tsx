@@ -2,27 +2,36 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Edit3, FilePlus2, Trash2 } from "lucide-react";
 
 export function ClientDossierActions({ clientId, clientName }: { clientId: string; clientName: string }) {
   const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [feedback, setFeedback] = useState("");
 
   async function removeClient() {
+    if (deleting) return;
     if (!window.confirm(`Supprimer le dossier de ${clientName} ?`)) return;
 
-    const response = await fetch(`/api/admin/clients/${clientId}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-
-    if (!response.ok) {
+    setDeleting(true);
+    setFeedback("");
+    try {
+      const response = await fetch(`/api/admin/clients/${clientId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       const result = (await response.json().catch(() => ({}))) as { message?: string };
-      window.alert(result.message || "Impossible de supprimer le client.");
-      return;
-    }
+      if (!response.ok) {
+        setFeedback(result.message || "La suppression du client n’a pas pu être terminée. Aucune donnée n’a été supprimée. Veuillez réessayer.");
+        return;
+      }
 
-    router.push("/admin/clients");
-    router.refresh();
+      router.push("/admin/clients?deleted=1");
+      router.refresh();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -38,12 +47,15 @@ export function ClientDossierActions({ clientId, clientName }: { clientId: strin
         <button
           type="button"
           onClick={removeClient}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-canada/25 bg-canada/10 px-5 py-3 text-sm font-black text-canada transition hover:bg-canada hover:text-white"
+          disabled={deleting}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-canada/25 bg-canada/10 px-5 py-3 text-sm font-black text-canada transition hover:bg-canada hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Trash2 className="h-4 w-4" />
-          Supprimer
+          {deleting ? "Suppression..." : "Supprimer"}
         </button>
       </div>
+
+      {feedback ? <p role="alert" className="rounded-2xl bg-canada/10 px-4 py-3 text-sm font-bold text-canada">{feedback}</p> : null}
 
       <div className="rounded-[1.5rem] border border-gold/25 bg-gold/10 p-4">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-navy/52">Documents automatiques</p>
