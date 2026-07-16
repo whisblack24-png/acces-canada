@@ -81,6 +81,18 @@ select id, 'dossier', 'Dossier créé', 'Création initiale du dossier client.',
 from public.admin_clients c
 where not exists (select 1 from public.client_timeline_events e where e.client_id = c.id and e.source_table = 'admin_clients' and e.source_id = c.id::text and e.title = 'Dossier créé');
 
+create or replace function public.capture_admin_client_created()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  insert into public.client_timeline_events(client_id, event_type, title, description, source_table, source_id, created_at, created_by)
+  values (new.id, 'dossier', 'Dossier créé', 'Création initiale du dossier client.', 'admin_clients', new.id::text, new.created_at, 'system');
+  return new;
+end $$;
+revoke all on function public.capture_admin_client_created() from public, anon, authenticated;
+grant execute on function public.capture_admin_client_created() to service_role;
+drop trigger if exists timeline_admin_client_created on public.admin_clients;
+create trigger timeline_admin_client_created after insert on public.admin_clients for each row execute function public.capture_admin_client_created();
+
 create or replace function public.capture_client_timeline_event()
 returns trigger language plpgsql set search_path = public as $$
 declare v_client_id uuid; v_title text; v_description text; v_source_id text;

@@ -13,7 +13,7 @@ export default async function ClientLoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-ivory px-5 py-10">
+    <main className="grid min-h-screen min-w-0 place-items-center overflow-x-hidden bg-ivory px-4 py-8 sm:px-5 sm:py-10">
       <ClientLoginForm />
     </main>
   );

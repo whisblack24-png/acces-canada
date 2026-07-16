@@ -50,19 +50,19 @@ export function ClientLoginForm() {
   }
 
   return (
-    <div className="w-full max-w-xl rounded-[2rem] bg-white p-6 shadow-premium md:p-8">
+    <div className="min-w-0 w-full max-w-xl overflow-hidden rounded-[2rem] bg-white p-5 shadow-premium sm:p-6 md:p-8">
       <div className="mb-7 flex items-center justify-between gap-4">
         <Image src="/images/logo.png" alt="Accès Canada" width={58} height={58} className="h-14 w-14 rounded-2xl" />
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-full border border-navy/10 px-4 py-2 text-xs font-black text-navy/70 transition hover:border-gold hover:text-navy"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-navy/10 px-3 py-2 text-xs font-black text-navy/70 transition hover:border-gold hover:text-navy sm:px-4"
         >
           <ArrowLeft className="h-4 w-4" />
           Site officiel
         </Link>
       </div>
       <p className="text-xs font-black uppercase tracking-[0.22em] text-canada">Portail client</p>
-      <h1 className="mt-3 font-display text-4xl font-black text-navy">Connexion sécurisée</h1>
+      <h1 className="mt-3 break-words font-display text-3xl font-black text-navy sm:text-4xl">Connexion sécurisée</h1>
       <p className="mt-4 leading-7 text-navy/60">
         Entrez le courriel associé à votre dossier. Un code temporaire vous sera envoyé pour protéger votre accès.
       </p>
