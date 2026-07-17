@@ -10,8 +10,8 @@ test("le cachet officiel respecte les textes approuvés et possède toutes ses v
   const seal = readFileSync("public/brand/seal-official.svg", "utf8");
   assert.match(seal, /ACCÈS CANADA/);
   assert.match(seal, /DOCUMENT OFFICIEL/);
-  assert.match(seal, /VOTRE CHEMIN VERS LE CANADA,[\s\S]*NOTRE ENGAGEMENT\./i);
   assert.doesNotMatch(seal, /IMMIGRATION|DEPUIS 2026/i);
+  assert.doesNotMatch(seal, /SIGNÉ NUMÉRIQUEMENT|SIGNATURE NUMÉRIQUE/i);
 });
 
 test("les documents disposent des signatures, du cachet, du QR et du pied de page commun", () => {
@@ -21,7 +21,9 @@ test("les documents disposent des signatures, du cachet, du QR et du pied de pag
   assert.match(branding, /Christian Nkuli Mboyo/);
   assert.match(branding, /Me Régine Sifa Buledi/);
   assert.match(branding, /Signature du client/);
-  assert.match(branding, /SIGNÉ NUMÉRIQUEMENT/);
+  assert.equal(existsSync("public/brand/signature-director.png"), true);
+  assert.match(branding, /VÉRIFICATION DU DOCUMENT/);
+  assert.doesNotMatch(branding, /SIGNÉ NUMÉRIQUEMENT|SIGNATURE NUMÉRIQUE/i);
   assert.match(branding, /Empreinte SHA-256/);
   assert.match(branding, /Document confidentiel - Acces Canada/);
   assert.match(branding, /Page.*sur/);

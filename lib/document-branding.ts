@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import { formatDateFr } from "./format.ts";
 import { brand } from "./site.ts";
+import { directorSignatureHeight, directorSignatureRuns, directorSignatureWidth } from "./signature-director-data.ts";
 
 export const PDF_NAVY = "0.051 0.106 0.165";
 export const PDF_GOLD = "0.831 0.686 0.216";
@@ -37,10 +38,13 @@ export function watermarkCommands(pageWidth=612,pageHeight=792){const cx=pageWid
 ].join("");
 }
 
-export function officialSealCommands(x:number,y:number,size:number,digitallySigned=false){const c=size/2;let out=pdfCircle(x+c,y+c,c-3,PDF_GOLD,false,4);out+=pdfCircle(x+c,y+c,c-13,PDF_NAVY,false,11);out+=pdfCircle(x+c,y+c,c-28,PDF_GOLD,false,2);out+=pdfText("ACCÈS CANADA",x+size*.17,y+size*.76,size*.075,"F2",PDF_NAVY);out+=pdfText("AC",x+size*.31,y+size*.39,size*.22,"F2",PDF_NAVY);out+=pdfText("DOCUMENT OFFICIEL",x+size*.14,y+size*.16,size*.055,"F2",PDF_GOLD);out+=pdfText("*",x+size*.47,y+size*.62,size*.14,"F2",PDF_RED);if(digitallySigned){out+=pdfRect(x+size*.1,y+size*.05,size*.8,size*.12,PDF_NAVY);out+=pdfText("SIGNÉ NUMÉRIQUEMENT",x+size*.16,y+size*.09,size*.038,"F2","1 1 1");}return out;}
+// The fourth argument remains for compatibility with existing document templates.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function officialSealCommands(x:number,y:number,size:number,_digitallySigned=false){const c=size/2;let out=pdfCircle(x+c,y+c,c-3,"1 1 1",true);out+=pdfCircle(x+c,y+c,c-3,PDF_GOLD,false,3);out+=pdfCircle(x+c,y+c,c-11,PDF_NAVY,false,3);out+=pdfCircle(x+c,y+c,c-23,PDF_GOLD,false,1.3);out+=pdfText("ACCÈS CANADA",x+size*.19,y+size*.76,size*.065,"F2",PDF_NAVY);out+=pdfText("AC",x+size*.31,y+size*.38,size*.22,"F2",PDF_NAVY);out+=pdfText("DOCUMENT OFFICIEL",x+size*.16,y+size*.15,size*.048,"F2",PDF_GOLD);out+=pdfText("*",x+size*.47,y+size*.60,size*.13,"F2",PDF_RED);return out;}
 
-function signaturePath(kind:"director"|"counsel",x:number,y:number,width:number){const scale=width/900,sy=scale*.58;const path=kind==="director"?"40 166 m 100 28 138 44 107 170 c 91 234 135 136 165 95 c 185 68 189 151 210 147 c 239 142 240 56 259 51 c 284 43 263 169 293 157 c 317 147 327 90 348 92 c 374 95 361 162 390 157 c 424 151 445 73 463 88 c 479 102 444 156 475 160 c 509 165 546 84 567 96 c 586 108 559 157 586 161 c 622 166 650 99 677 99 c 700 100 684 152 713 155 c 740 158 773 123 806 114 c":"35 175 m 89 42 151 35 125 165 c 112 230 150 156 173 109 c 188 78 197 164 216 157 c 245 146 255 66 278 63 c 300 61 273 162 306 157 c 342 151 357 66 383 69 c 407 72 374 151 407 154 c 436 156 458 85 485 87 c 509 89 478 153 505 158 c 540 165 574 84 597 91 c 619 98 588 151 615 157 c 645 164 675 101 700 106 c 725 111 700 156 731 156 c 771 156 800 117 839 127 c";return `q ${PDF_NAVY} RG 6 w 1 J 1 j ${scale} 0 0 ${sy} ${x} ${y} cm ${path} S Q\n`;}
-export function companySignatureCommands(kind:"director"|"counsel",x:number,y:number,width=190){const director=kind==="director";return signaturePath(kind,x,y+28,width)+pdfText(director?"Christian Nkuli Mboyo":"Me Régine Sifa Buledi",x,y+20,9,"F2",PDF_NAVY)+pdfText(director?"Directeur général":"Conseillère juridique",x,y+7,7.5,"F1",PDF_MUTED)+pdfText("Accès Canada",x,y-5,7.5,"F1",PDF_MUTED);}
+function signaturePath(kind:"counsel",x:number,y:number,width:number){const scale=width/900,sy=scale*.58;const path="35 175 m 89 42 151 35 125 165 c 112 230 150 156 173 109 c 188 78 197 164 216 157 c 245 146 255 66 278 63 c 300 61 273 162 306 157 c 342 151 357 66 383 69 c 407 72 374 151 407 154 c 436 156 458 85 485 87 c 509 89 478 153 505 158 c 540 165 574 84 597 91 c 619 98 588 151 615 157 c 645 164 675 101 700 106 c 725 111 700 156 731 156 c 771 156 800 117 839 127 c";return `q ${PDF_NAVY} RG 6 w 1 J 1 j ${scale} 0 0 ${sy} ${x} ${y} cm ${path} S Q\n`;}
+function directorSignatureCommands(x:number,y:number,width:number){const scale=width/directorSignatureWidth,height=directorSignatureHeight*scale;return directorSignatureRuns.map(([rx,ry,rw])=>pdfRect(x+rx*scale,y+ry*scale,Math.max(rw*scale,.2),Math.max(height/directorSignatureHeight,.2),PDF_NAVY)).join("");}
+export function companySignatureCommands(kind:"director"|"counsel",x:number,y:number,width=190){const director=kind==="director";const mark=director?directorSignatureCommands(x,y+28,width):signaturePath("counsel",x,y+28,width);return mark+pdfText(director?"Christian Nkuli Mboyo":"Me Régine Sifa Buledi",x,y+20,9,"F2",PDF_NAVY)+pdfText(director?"Directeur général":"Conseillère juridique",x,y+7,7.5,"F1",PDF_MUTED)+pdfText("Accès Canada",x,y-5,7.5,"F1",PDF_MUTED);}
 export function clientSignaturePlaceholder(x:number,y:number,width=190){return pdfLine(x,y+38,x+width,y+38,"0.70 0.72 0.75",.8)+pdfText("Signature du client",x,y+20,8,"F2",PDF_NAVY)+pdfText("Date : __________________",x,y+6,7.5,"F1",PDF_MUTED);}
 
 export function digitalSignatureCertificateCommands(meta:DocumentBrandMetadata,x:number,y:number,width=540){
@@ -50,7 +54,7 @@ export function digitalSignatureCertificateCommands(meta:DocumentBrandMetadata,x
   return [
     pdfRect(x,y,width,54,"0.955 0.965 0.975"),
     pdfRect(x,y,width,3,PDF_GOLD),
-    pdfText("SIGNÉ NUMÉRIQUEMENT",x+12,y+37,8,"F2",PDF_NAVY),
+    pdfText("VÉRIFICATION DU DOCUMENT",x+12,y+37,8,"F2",PDF_NAVY),
     pdfText(`Empreinte SHA-256 : ${first}`,x+12,y+21,6.5,"F1",PDF_MUTED),
     second?pdfText(second,x+105,y+9,6.5,"F1",PDF_MUTED):"",
   ].join("");

@@ -1,12 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
-  <title id="title">Cachet officiel Accès Canada</title><desc id="desc">Sceau circulaire bleu marine, or, blanc et rouge avec monogramme AC, feuille d’érable et lauriers.</desc>
-  <defs><radialGradient id="gold" cx="35%" cy="25%"><stop stop-color="#fff2a7"/><stop offset=".45" stop-color="#d4af37"/><stop offset="1" stop-color="#936d0f"/></radialGradient><filter id="emboss"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0d1b2a" flood-opacity=".25"/></filter><path id="topArc" d="M150 500a350 350 0 0 1 700 0"/><path id="bottomArc" d="M850 500a350 350 0 0 1-700 0"/></defs>
-  <g filter="url(#emboss)"><circle cx="500" cy="500" r="472" fill="url(#gold)"/><circle cx="500" cy="500" r="450" fill="#0d1b2a" stroke="#fff2a7" stroke-width="7"/><circle cx="500" cy="500" r="326" fill="#fff" stroke="url(#gold)" stroke-width="16"/><circle cx="500" cy="500" r="297" fill="none" stroke="#d4af37" stroke-width="5" stroke-dasharray="3 15" stroke-linecap="round"/>
-  <text fill="#fff" font-family="Georgia,serif" font-size="82" font-weight="700" letter-spacing="12"><textPath href="#topArc" startOffset="50%" text-anchor="middle">ACCÈS CANADA</textPath></text>
-  <text fill="#d4af37" font-family="Georgia,serif" font-size="58" font-weight="700" letter-spacing="8"><textPath href="#bottomArc" startOffset="50%" text-anchor="middle">DOCUMENT OFFICIEL</textPath></text>
-  <g fill="none" stroke="url(#gold)" stroke-width="16" stroke-linecap="round"><path d="M180 620Q115 520 175 392"/><path d="M820 620Q885 520 825 392"/></g>
-  <g fill="#d4af37"><path d="M170 580q-55-22-58-67 47 6 67 43zm-16-72q-48-31-42-73 44 15 57 53zm6-75q-39-39-24-78 38 23 43 62zm18-72q-28-45-6-79 31 29 27 68z"/><path d="M830 580q55-22 58-67-47 6-67 43zm16-72q48-31 42-73-44 15-57 53zm-6-75q39-39 24-78-38 23-43 62zm-18-72q28-45 6-79-31 29-27 68z"/></g>
-  <path fill="#d00000" d="M500 174l18 48 44-24-12 48 51 6-40 31 32 35-52-5 2 52-43-29-43 29 2-52-52 5 32-35-40-31 51-6-12-48 44 24z"/><path d="M500 330v45" stroke="#d00000" stroke-width="9"/>
-  <text x="500" y="585" text-anchor="middle" font-family="Georgia,serif" font-size="245" font-weight="700"><tspan fill="#0d1b2a">A</tspan><tspan fill="#d4af37">C</tspan></text><path d="M305 625h390" stroke="#d4af37" stroke-width="5"/><circle cx="500" cy="625" r="10" fill="#d4af37"/>
-  <text x="500" y="682" text-anchor="middle" fill="#0d1b2a" font-family="Arial,sans-serif" font-size="27" font-weight="700" letter-spacing="2">VOTRE CHEMIN VERS LE CANADA,</text><text x="500" y="717" text-anchor="middle" fill="#0d1b2a" font-family="Arial,sans-serif" font-size="27" font-weight="700" letter-spacing="2">NOTRE ENGAGEMENT.</text></g>
+  <title id="title">Cachet officiel Accès Canada</title>
+  <desc id="desc">Cachet clair à fond transparent, contours bleu marine et dorés, monogramme AC et feuille d’érable.</desc>
+  <defs><path id="top" d="M145 500a355 355 0 0 1 710 0"/><path id="bottom" d="M855 500a355 355 0 0 1-710 0"/></defs>
+  <circle cx="500" cy="500" r="465" fill="#fff" fill-opacity=".82" stroke="#d4af37" stroke-width="22"/>
+  <circle cx="500" cy="500" r="430" fill="none" stroke="#0b1d36" stroke-width="13"/>
+  <circle cx="500" cy="500" r="315" fill="none" stroke="#d4af37" stroke-width="7" stroke-dasharray="5 17"/>
+  <text fill="#0b1d36" font-family="Georgia,serif" font-size="78" font-weight="700" letter-spacing="10"><textPath href="#top" startOffset="50%" text-anchor="middle">ACCÈS CANADA</textPath></text>
+  <text fill="#0b1d36" font-family="Georgia,serif" font-size="48" font-weight="700" letter-spacing="6"><textPath href="#bottom" startOffset="50%" text-anchor="middle">DOCUMENT OFFICIEL</textPath></text>
+  <path fill="#d00000" d="M500 178l18 49 45-25-13 49 53 7-42 31 33 37-53-6 2 54-43-30-43 30 2-54-53 6 33-37-42-31 53-7-13-49 45 25z"/>
+  <path d="M500 335v46" stroke="#d00000" stroke-width="9"/>
+  <text x="500" y="610" text-anchor="middle" font-family="Georgia,serif" font-size="250" font-weight="700"><tspan fill="#0b1d36">A</tspan><tspan fill="#d4af37">C</tspan></text>
+  <path d="M315 650h370" stroke="#d4af37" stroke-width="7"/><circle cx="500" cy="650" r="10" fill="#d4af37"/>
+  <path d="M208 622q-62-98-15-216m599 216q62-98 15-216" fill="none" stroke="#d4af37" stroke-width="17" stroke-linecap="round"/>
 </svg>

@@ -353,8 +353,8 @@ export function generateClientPdf(client: AdminClient, type: ClientDocumentType,
   const needsCounsel=["convention","lettre-explicative","lettre-soutien-financier","lettre-invitation"].includes(type);
   if(needsCounsel)content.push(companySignatureCommands("counsel",220,y,170));
   content.push(clientSignaturePlaceholder(410,y,150));
-  content.push(digitalSignatureCertificateCommands(meta,36,y-76,540));
-  pages.push(content);const builder=new BrandedPdfBuilder();pages.forEach((commands,index)=>builder.addPage(commands.join("")+officialSealCommands(470,76,92,meta.digitallySigned)+premiumFooterCommands(meta,index+1,pages.length)));return builder.finish();
+  content.push(digitalSignatureCertificateCommands(meta,36,y-76,360));
+  pages.push(content);const builder=new BrandedPdfBuilder();pages.forEach((commands,index)=>builder.addPage(commands.join("")+officialSealCommands(430,76,92,meta.digitallySigned)+premiumFooterCommands(meta,index+1,pages.length)));return builder.finish();
 }
 
 export function isClientDocumentType(type: string): type is ClientDocumentType {
