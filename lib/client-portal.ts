@@ -304,6 +304,13 @@ export async function deleteClientFile(clientId: string, uploadId: string) {
   return record;
 }
 
+export async function renameClientUpload(clientId:string,uploadId:string,fileName:string){
+  const {url,key,uploadsTable}=config();
+  const response=await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}&status=eq.active`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify({file_name:fileName,updated_at:new Date().toISOString()})});
+  if(!response.ok)await fail("Renommage document client",response);
+  const row=((await response.json()) as ClientUploadedDocument[])[0];if(!row)throw new Error("Document introuvable.");return row;
+}
+
 export async function deleteClientStorageFiles(filePaths: string[]) {
   const { url, key, bucket } = config();
   const failures: string[] = [];

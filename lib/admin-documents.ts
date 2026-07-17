@@ -193,6 +193,8 @@ export async function deleteGeneratedDocument(id: string) {
   }
 }
 
+export async function renameGeneratedDocument(id:string,fileName:string){const{url,key,table}=supabaseConfig();const response=await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&status=eq.active`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify({file_name:fileName})});if(!response.ok)throw await supabaseError("Renommage document",response);const row=((await response.json()) as GeneratedDocument[])[0];if(!row)throw new Error("Document introuvable.");return row;}
+
 export async function restoreGeneratedDocument(id:string){
   const {url,key,table}=supabaseConfig();
   const targetResponse=await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&status=eq.replaced&select=*&limit=1`,{headers:headers(key),cache:"no-store"});

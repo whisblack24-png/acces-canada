@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { deleteClientFile } from "@/lib/client-portal";
+import { deleteClientFile, renameClientUpload } from "@/lib/client-portal";
 
 export const runtime = "nodejs";
 
@@ -27,4 +27,13 @@ export async function DELETE(request: Request, context: Context) {
     console.error("Erreur suppression document client:", error);
     return NextResponse.json({ message: "Impossible de supprimer le document client." }, { status: 500 });
   }
+}
+
+export async function PATCH(request: Request, context: Context) {
+  if (!(await isAdminAuthenticated())) return NextResponse.json({ message: "Non autorisé." }, { status: 401 });
+  const { id } = await context.params; const clientId = new URL(request.url).searchParams.get("clientId");
+  const body = await request.json() as { file_name?: string }; const fileName = String(body.file_name || "").trim().slice(0,240);
+  if (!clientId || !fileName) return NextResponse.json({ message: "Nom et client requis." }, { status: 400 });
+  try { return NextResponse.json({ upload: await renameClientUpload(clientId,id,fileName) }); }
+  catch (error) { console.error("Renommage document client:",error); return NextResponse.json({ message: "Impossible de renommer le document." }, { status: 500 }); }
 }
