@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import type React from "react";
 import { redirect } from "next/navigation";
-import { CalendarCheck, CreditCard, FileText, ReceiptText } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AppointmentsManager } from "@/components/admin/AppointmentsManager";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { listAppointments } from "@/lib/booking";
-import { formatMoney } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Rendez-vous et paiements",
@@ -18,9 +15,6 @@ export default async function AdminAppointmentsPage() {
   }
 
   const appointments = await listAppointments().catch(() => []);
-  const confirmed = appointments.filter((appointment) => appointment.status === "confirmed");
-  const cancelled = appointments.filter((appointment) => appointment.status === "cancelled");
-  const revenue = confirmed.reduce((total, appointment) => total + appointment.amount_cents / 100, 0);
 
   return (
     <AdminShell>
@@ -33,25 +27,8 @@ export default async function AdminAppointmentsPage() {
           </p>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Rendez-vous" value={String(appointments.length)} icon={<CalendarCheck className="h-5 w-5" />} />
-          <Stat label="Confirmés" value={String(confirmed.length)} icon={<CreditCard className="h-5 w-5" />} />
-          <Stat label="Annulés" value={String(cancelled.length)} icon={<FileText className="h-5 w-5" />} />
-          <Stat label="Revenus consultations" value={`${formatMoney(revenue)} USD`} icon={<ReceiptText className="h-5 w-5" />} />
-        </section>
-
         <AppointmentsManager initialAppointments={appointments} />
       </div>
     </AdminShell>
-  );
-}
-
-function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
-  return (
-    <div className="bg-white p-5 shadow-premium">
-      <span className="grid h-11 w-11 place-items-center bg-gold/20 text-navy">{icon}</span>
-      <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-navy/42">{label}</p>
-      <p className="mt-2 text-3xl font-black text-navy">{value}</p>
-    </div>
   );
 }

@@ -28,6 +28,10 @@ export type Appointment = {
   starts_at: string;
   ends_at: string;
   payment_method_label: string | null;
+  fulfillment_status?: "processing" | "completed" | "failed";
+  fulfillment_completed_at?: string | null;
+  confirmation_email_sent_at?: string | null;
+  fulfillment_error?: string | null;
 };
 
 export const consultationTypes: Record<

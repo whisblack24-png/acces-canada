@@ -44,6 +44,7 @@ export function BookingForm() {
   const [message, setMessage] = useState("");
   const [invoiceSessionId, setInvoiceSessionId] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
 
   const selectedType = consultationTypes[consultationType];
   const selectedSlotLabel = slots.find((slot) => slot.value === selectedSlot)?.label || "Aucun créneau sélectionné";
@@ -103,6 +104,19 @@ export function BookingForm() {
       if (timeout) clearTimeout(timeout);
     };
   }, [invoiceSessionId]);
+
+  useEffect(() => {
+    if (confirmation?.status !== "confirmed") return;
+    setRedirectSeconds(10);
+    const interval = window.setInterval(() => {
+      setRedirectSeconds((seconds) => (seconds === null ? null : Math.max(0, seconds - 1)));
+    }, 1_000);
+    const redirect = window.setTimeout(() => window.location.assign("/"), 10_000);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(redirect);
+    };
+  }, [confirmation?.status]);
 
   useEffect(() => {
     let active = true;
@@ -188,14 +202,23 @@ export function BookingForm() {
           <p className="mx-auto mt-4 max-w-2xl text-sm font-bold leading-7 text-navy/70">{message}</p>
 
           {confirmation.status === "confirmed" ? (
-            <div className="mx-auto mt-6 grid max-w-2xl gap-3 bg-white p-5 text-left text-sm font-bold text-navy/70 sm:grid-cols-2">
-              <Summary icon={<FileText />} label="Réservation" value={confirmation.bookingReference || "-"} />
-              <Summary icon={<FileText />} label="Facture" value={confirmation.invoiceNumber || "-"} />
-              {confirmation.startsAt ? <Summary icon={<CalendarDays />} label="Date et heure" value={new Date(confirmation.startsAt).toLocaleString("fr-CA")} /> : null}
-              <Summary icon={<Clock3 />} label="Consultation" value={`${confirmation.consultationLabel || "Consultation"} · ${confirmation.consultationMode || ""}`} />
-              <Summary icon={<Clock3 />} label="Durée" value={`${confirmation.durationMinutes || 0} minutes`} />
-              <Summary icon={<CreditCard />} label="Montant payé" value={`${formatMoney((confirmation.amountCents || 0) / 100)} US`} />
-            </div>
+            <>
+              <div className="mx-auto mt-6 grid max-w-2xl gap-3 text-left sm:grid-cols-2">
+                <p className="flex items-center gap-3 bg-emerald-50 p-4 font-black text-emerald-800"><CheckCircle2 className="h-5 w-5" /> Paiement confirmé</p>
+                <p className="flex items-center gap-3 bg-emerald-50 p-4 font-black text-emerald-800"><CheckCircle2 className="h-5 w-5" /> Rendez-vous confirmé</p>
+              </div>
+              <div className="mx-auto mt-3 grid max-w-2xl gap-3 bg-white p-5 text-left text-sm font-bold text-navy/70 sm:grid-cols-2">
+                <Summary icon={<FileText />} label="Réservation" value={confirmation.bookingReference || "-"} />
+                <Summary icon={<FileText />} label="Facture" value={confirmation.invoiceNumber || "-"} />
+                {confirmation.startsAt ? <Summary icon={<CalendarDays />} label="Date et heure" value={new Date(confirmation.startsAt).toLocaleString("fr-CA")} /> : null}
+                <Summary icon={<Clock3 />} label="Consultation" value={`${confirmation.consultationLabel || "Consultation"} · ${confirmation.consultationMode || ""}`} />
+                <Summary icon={<Clock3 />} label="Durée" value={`${confirmation.durationMinutes || 0} minutes`} />
+                <Summary icon={<CreditCard />} label="Montant payé" value={`${formatMoney((confirmation.amountCents || 0) / 100)} US`} />
+              </div>
+              <p className="mt-4 text-xs font-black uppercase tracking-[0.12em] text-navy/50">
+                Redirection automatique vers l’accueil dans {redirectSeconds ?? 10} seconde{redirectSeconds === 1 ? "" : "s"}.
+              </p>
+            </>
           ) : (
             <p className="mt-6 font-black text-navy">Finalisation du rendez-vous en cours…</p>
           )}
@@ -209,7 +232,7 @@ export function BookingForm() {
             <Link href="/client/login" className="inline-flex items-center gap-2 bg-gold px-6 py-3 text-sm font-black text-navy">
               <LogIn className="h-4 w-4" /> Accéder à mon espace client
             </Link>
-            <Link href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Retour à l'accueil</Link>
+            <Link href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Continuer vers l’accueil</Link>
           </div>
         </section>
       ) : null}
@@ -219,7 +242,7 @@ export function BookingForm() {
           <div role="status" aria-live="polite" className="flex items-start gap-3 border border-gold/35 bg-[#FBF7EA] p-4 text-sm font-bold leading-6 text-navy">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-canada" />
             <span>{message}</span>
-            {invoiceSessionId ? (
+            {invoiceSessionId && confirmation?.status === "confirmed" ? (
               <a href={`/api/booking/invoice/session/${invoiceSessionId}`} className="ml-auto shrink-0 font-black text-canada underline">
                 Télécharger la facture
               </a>

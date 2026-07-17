@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
     }));
     return NextResponse.json({ message: "Impossible de vérifier la facture pour le moment." }, { status: 500 });
   }
-  if (!appointment) {
+  if (!appointment || appointment.fulfillment_status !== "completed") {
     return NextResponse.json({ message: "La facture sera disponible dès la confirmation Stripe finalisée." }, { status: 404 });
   }
 

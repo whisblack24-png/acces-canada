@@ -7,6 +7,7 @@ import { appointmentConfirmationEmailHtml } from "@/lib/appointment-confirmation
 import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
 import { generatePremiumAppointmentInvoicePdf } from "@/lib/appointment-invoice";
 import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
+import { createClient } from "@/lib/admin-data";
 import {
   consultationModeLabels,
   consultationTypes,
@@ -342,8 +343,11 @@ export async function confirmAppointmentFromStripeSession(session: {
   const existing = ((await existingResponse.json()) as Appointment[])[0];
   if (existing) {
     logBooking("appointment_existing", session.id, { appointmentId: existing.id });
-    await sendAppointmentConfirmationEmail(existing);
-    logBooking("email_complete", session.id, { appointmentId: existing.id });
+    await ensureAppointmentClient(existing);
+    if (existing.fulfillment_status !== "completed") {
+      await completeAppointmentFulfillment(existing);
+      return (await getAppointment(existing.id)) || existing;
+    }
     return existing;
   }
 
@@ -358,6 +362,14 @@ export async function confirmAppointmentFromStripeSession(session: {
     country: metadata.country || "",
     reason: metadata.reason || "",
     consultationMode: metadata.consultation_mode as ConsultationMode,
+  });
+
+  await ensureAppointmentClient({
+    client_full_name: normalized.fullName,
+    client_email: normalized.email,
+    client_phone: normalized.phone,
+    client_country: normalized.country,
+    amount_cents: normalized.type.amountCents,
   });
 
   const conflictResponse = await fetch(
@@ -395,6 +407,10 @@ export async function confirmAppointmentFromStripeSession(session: {
     starts_at: normalized.starts.toISOString(),
     ends_at: normalized.ends.toISOString(),
     payment_method_label: session.payment_method_types?.[0] || "Carte bancaire",
+    fulfillment_status: "processing",
+    fulfillment_completed_at: null,
+    confirmation_email_sent_at: null,
+    fulfillment_error: null,
   };
 
   const insertResponse = await fetch(`${url}/rest/v1/${table}`, {
@@ -405,9 +421,61 @@ export async function confirmAppointmentFromStripeSession(session: {
   if (!insertResponse.ok) await supabaseError("Confirmation du rendez-vous", insertResponse);
   const appointment = ((await insertResponse.json()) as Appointment[])[0];
   logBooking("appointment_inserted", session.id, { appointmentId: appointment.id });
-  await sendAppointmentConfirmationEmail(appointment);
-  logBooking("email_complete", session.id, { appointmentId: appointment.id });
-  return appointment;
+  await completeAppointmentFulfillment(appointment);
+  return (await getAppointment(appointment.id)) || appointment;
+}
+
+async function ensureAppointmentClient(appointment: Pick<Appointment, "client_full_name" | "client_email" | "client_phone" | "client_country" | "amount_cents">) {
+  const { url, key } = config();
+  const lookup = await fetch(
+    `${url}/rest/v1/admin_clients?email=ilike.${encodeURIComponent(appointment.client_email)}&select=id&limit=1`,
+    { headers: headers(key), cache: "no-store" },
+  );
+  if (!lookup.ok) await supabaseError("Recherche du client du rendez-vous", lookup);
+  if (((await lookup.json()) as { id: string }[]).length) return;
+
+  await createClient({
+    full_name: appointment.client_full_name,
+    email: appointment.client_email,
+    phone: appointment.client_phone,
+    country: appointment.client_country,
+    service: "autre",
+    status: "nouveau",
+    notes: "Client créé automatiquement après confirmation d’un paiement Stripe.",
+    internal_notes: "Origine : réservation de consultation Stripe.",
+    paid_amount: appointment.amount_cents / 100,
+  });
+  logBooking("crm_client_ready", "automatic", { email: appointment.client_email });
+}
+
+async function updateAppointmentFulfillment(id: string, payload: Record<string, string | null>) {
+  const { url, key, table } = config();
+  const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: headers(key),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) await supabaseError("Finalisation du rendez-vous", response);
+}
+
+async function completeAppointmentFulfillment(appointment: Appointment) {
+  try {
+    await sendAppointmentConfirmationEmail(appointment);
+    const completedAt = new Date().toISOString();
+    await updateAppointmentFulfillment(appointment.id, {
+      fulfillment_status: "completed",
+      fulfillment_completed_at: completedAt,
+      confirmation_email_sent_at: completedAt,
+      fulfillment_error: null,
+    });
+    logBooking("fulfillment_complete", appointment.stripe_session_id, { appointmentId: appointment.id });
+  } catch (error) {
+    await updateAppointmentFulfillment(appointment.id, {
+      fulfillment_status: "failed",
+      fulfillment_error: (error instanceof Error ? error.message : "Erreur de finalisation").slice(0, 1000),
+    }).catch((updateError) => console.error("[appointment-booking] Échec de journalisation de la finalisation", updateError));
+    throw error;
+  }
 }
 
 function invoiceRows(appointment: Appointment) {

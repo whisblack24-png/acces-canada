@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, Download, Mail, Search, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarX2, CreditCard, Download, Mail, ReceiptText, Search } from "lucide-react";
 import {
   consultationModeLabels,
   consultationTypes,
@@ -45,6 +45,17 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
     });
   }, [appointments, search, status, date]);
 
+  const stats = useMemo(() => {
+    const confirmed = appointments.filter((appointment) => appointment.status === "confirmed");
+    const now = Date.now();
+    return {
+      active: confirmed.length,
+      upcoming: confirmed.filter((appointment) => Date.parse(appointment.starts_at) >= now).length,
+      cancelled: appointments.filter((appointment) => appointment.status === "cancelled").length,
+      revenue: confirmed.reduce((total, appointment) => total + appointment.amount_cents / 100, 0),
+    };
+  }, [appointments]);
+
   const calendarDays = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -63,27 +74,38 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
   async function action(id: string, body: Record<string, string>) {
     setBusyId(id);
     setMessage("");
-    const response = await fetch(`/api/admin/appointments/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      setMessage(data.message || "Action impossible.");
+    try {
+      const response = await fetch(`/api/admin/appointments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.message || "Action impossible.");
+        return;
+      }
+      if (data.appointment) {
+        setAppointments((items) => items.map((item) => (item.id === id ? data.appointment : item)));
+      }
+      setMessage(body.action === "resend" ? "Courriel de confirmation renvoyé." : body.action === "cancel" ? "Le rendez-vous a été annulé et retiré des statistiques actives." : "Rendez-vous mis à jour.");
+    } catch {
+      setMessage("La mise à jour du rendez-vous a échoué. Veuillez réessayer.");
+    } finally {
       setBusyId("");
-      return;
     }
-    if (data.appointment) {
-      setAppointments((items) => items.map((item) => (item.id === id ? data.appointment : item)));
-    }
-    setMessage(body.action === "resend" ? "Courriel de confirmation renvoyé." : "Rendez-vous mis à jour.");
-    setBusyId("");
   }
 
   return (
     <div className="space-y-5">
       {message ? <p className="border border-gold/40 bg-[#FBF7EA] p-4 text-sm font-bold text-navy">{message}</p> : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-live="polite">
+        <Stat label="Rendez-vous actifs" value={String(stats.active)} icon={<CalendarClock className="h-5 w-5" />} />
+        <Stat label="À venir" value={String(stats.upcoming)} icon={<CreditCard className="h-5 w-5" />} />
+        <Stat label="Annulés" value={String(stats.cancelled)} icon={<CalendarX2 className="h-5 w-5" />} />
+        <Stat label="Revenus actifs" value={`${formatMoney(stats.revenue)} USD`} icon={<ReceiptText className="h-5 w-5" />} />
+      </section>
 
       <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
         <div className="flex items-center justify-between gap-4">
@@ -187,11 +209,16 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
                 <button
                   type="button"
                   disabled={busyId === appointment.id || appointment.status === "cancelled"}
-                  onClick={() => action(appointment.id, { action: "cancel" })}
-                  className="grid h-10 w-10 place-items-center bg-canada text-white disabled:opacity-40"
-                  title="Annuler"
+                  onClick={() => {
+                    if (window.confirm(`Annuler le rendez-vous ${appointment.booking_reference} ? La facture et l’historique seront conservés.`)) {
+                      void action(appointment.id, { action: "cancel" });
+                    }
+                  }}
+                  className="inline-flex min-h-10 items-center gap-2 bg-canada px-3 text-xs font-black text-white disabled:opacity-40"
+                  title="Annuler le rendez-vous"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <CalendarX2 className="h-4 w-4" />
+                  {busyId === appointment.id ? "Annulation…" : appointment.status === "cancelled" ? "Annulé" : "Annuler le rendez-vous"}
                 </button>
               </span>
             </div>
@@ -200,6 +227,16 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
           <p className="p-5 text-sm font-bold text-navy/50">Aucun rendez-vous ne correspond aux filtres.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+  return (
+    <div className="bg-white p-5 shadow-premium">
+      <span className="grid h-11 w-11 place-items-center bg-gold/20 text-navy">{icon}</span>
+      <p className="mt-5 text-xs font-black uppercase tracking-[0.16em] text-navy/42">{label}</p>
+      <p className="mt-2 text-3xl font-black text-navy">{value}</p>
     </div>
   );
 }

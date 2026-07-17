@@ -16,6 +16,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
       return NextResponse.json({ status: "pending" }, { headers: { "Cache-Control": "no-store" } });
     }
 
+    if (appointment.fulfillment_status !== "completed") {
+      return NextResponse.json(
+        { status: "pending", processing: appointment.fulfillment_status || "processing" },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     return NextResponse.json(
       {
         status: "confirmed",
