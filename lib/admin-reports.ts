@@ -4,6 +4,7 @@ import { listGeneratedDocuments, type GeneratedDocument } from "@/lib/admin-docu
 import { listAllClientUploads, type ClientUploadedDocument } from "@/lib/client-portal";
 import { brand } from "@/lib/site";
 import { formatDateFr, formatUsd } from "@/lib/format";
+import { officialSealCommands, premiumFooterCommands, qrCodeCommands, verificationUrl, watermarkCommands } from "@/lib/document-branding";
 
 export type ReportRow = {
   label: string;
@@ -123,6 +124,7 @@ export function generateAdminReportPdf(report: AdminReport) {
   const generatedDate = formatDateFr(report.generatedAt);
   let y = 760;
 
+  content.push(watermarkCommands());
   content.push("q 0.043 0.114 0.212 rg 0 720 612 72 re f Q\n");
   content.push("q 0.831 0.686 0.216 rg 36 706 540 3 re f Q\n");
   line(content, brand.name.toUpperCase(), 36, 756, 21, true, "1 1 1");
@@ -194,6 +196,10 @@ export function generateAdminReportPdf(report: AdminReport) {
 
   content.push("q 0.8 0.063 0.18 rg 36 45 540 1 re f Q\n");
   line(content, `${brand.phone}  |  ${brand.email}`, 36, 30, 8, false, "0.3 0.3 0.3");
+  const documentNumber=`AC-RPT-${report.generatedAt.slice(0,10).replace(/-/g,"")}`;
+  content.push(officialSealCommands(470,72,86,false));
+  content.push(premiumFooterCommands({documentNumber},1,1));
+  content.push(qrCodeCommands(verificationUrl(),540,8,42));
 
   const stream = content.join("");
   const parts = ["%PDF-1.4\n"];

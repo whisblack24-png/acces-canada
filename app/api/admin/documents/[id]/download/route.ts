@@ -29,7 +29,7 @@ export async function GET(_request: Request, context: Context) {
 
   const questionnaires = await getDecryptedQuestionnaires(client.id);
   const data = Object.fromEntries(questionnaires.map(({ row, answers }) => [row.questionnaire_type === "client_principal" ? "client" : "guarantor", answers]));
-  const pdf = generateClientPdf(client, document.document_type, document.included_information || {}, data);
+  const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, data, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true });
 
   return new Response(new Uint8Array(pdf), {
     headers: {

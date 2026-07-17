@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       client_name: client.full_name,
       document_type: body.document_type,
       file_name: documentFileName(client, body.document_type),
-      included_information: body.included_information || {},
+      included_information: { ...(body.included_information || {}), includeSignatures: true },
     });
 
     await updateClient(client.id, {

@@ -1,5 +1,6 @@
 ﻿import type { ClientDocumentType, DocumentGenerationOptions } from "@/lib/pdf-documents";
 import { documentLabels } from "@/lib/pdf-documents";
+import { createHash, randomUUID } from "node:crypto";
 
 export type GeneratedDocument = {
   id: string;
@@ -13,6 +14,12 @@ export type GeneratedDocument = {
   version: number;
   status: "active" | "replaced" | "deleted";
   replaced_document_id: string | null;
+  document_number: string;
+  verification_token: string;
+  authenticity_hash: string;
+  issued_at: string;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
 };
 
 export type GeneratedDocumentInput = {
@@ -125,11 +132,22 @@ export async function getGeneratedDocument(id: string) {
   return documents[0] || null;
 }
 
+export async function getGeneratedDocumentByVerificationToken(token: string) {
+  const { url, key, table } = supabaseConfig();
+  const response = await fetch(`${url}/rest/v1/${table}?verification_token=eq.${encodeURIComponent(token)}&select=id,document_number,document_type,document_label,status,version,issued_at,created_at,authenticity_hash,cancelled_at,cancellation_reason&limit=1`, { headers: headers(key), cache: "no-store" });
+  if (!response.ok) throw await supabaseError("Vérification document", response);
+  return ((await response.json()) as Pick<GeneratedDocument, "id" | "document_number" | "document_type" | "document_label" | "status" | "version" | "issued_at" | "created_at" | "authenticity_hash" | "cancelled_at" | "cancellation_reason">[])[0] || null;
+}
+
 export async function createGeneratedDocument(input: GeneratedDocumentInput) {
   const { url, key, table } = supabaseConfig();
   const previousResponse = await fetch(`${url}/rest/v1/${table}?client_id=eq.${encodeURIComponent(input.client_id)}&document_type=eq.${encodeURIComponent(input.document_type)}&status=eq.active&select=id,version&order=created_at.desc&limit=1`, { headers: headers(key), cache: "no-store" });
   if (!previousResponse.ok) throw await supabaseError("Lecture version document", previousResponse);
   const previous = ((await previousResponse.json()) as { id:string; version:number }[])[0];
+  const verificationToken = randomUUID();
+  const documentNumber = `AC-DOC-${new Date().getFullYear()}-${verificationToken.slice(0, 8).toUpperCase()}`;
+  const issuedAt = new Date().toISOString();
+  const authenticityHash = createHash("sha256").update(`${documentNumber}|${input.client_id}|${input.document_type}|${issuedAt}`).digest("hex");
   const response = await fetch(`${url}/rest/v1/${table}`, {
     method: "POST",
     headers: { ...headers(key), Prefer: "return=representation" },
@@ -143,6 +161,10 @@ export async function createGeneratedDocument(input: GeneratedDocumentInput) {
       version: Number(previous?.version || 0) + 1,
       status: "active",
       replaced_document_id: previous?.id || null,
+      document_number: documentNumber,
+      verification_token: verificationToken,
+      authenticity_hash: authenticityHash,
+      issued_at: issuedAt,
     }),
   });
 

@@ -5,8 +5,8 @@ import { Download, FilePlus2, Trash2 } from "lucide-react";
 import type { AdminClient, ServiceType } from "@/lib/admin-data";
 import { serviceLabels } from "@/lib/admin-data";
 import type { GeneratedDocument } from "@/lib/admin-documents";
-import { documentLibrary } from "@/lib/pdf-documents";
-import type { ClientDocumentType, DocumentGenerationOptions } from "@/lib/pdf-documents";
+import { caseDocumentRecommendations, documentLibrary, immigrationCaseLabels } from "@/lib/pdf-documents";
+import type { ClientDocumentType, DocumentGenerationOptions, ImmigrationCaseType } from "@/lib/pdf-documents";
 import { formatDateFr } from "@/lib/format";
 
 const defaultOptions: DocumentGenerationOptions = {
@@ -26,7 +26,6 @@ const optionLabels: { key: keyof DocumentGenerationOptions; label: string }[] = 
   { key: "includeDocuments", label: "Documents reçus / manquants" },
   { key: "includeNotes", label: "Notes internes" },
   { key: "includePayments", label: "Paiements" },
-  { key: "includeSignatures", label: "Signatures" },
 ];
 
 export function DocumentsManager({
@@ -40,6 +39,7 @@ export function DocumentsManager({
 }) {
   const [clientId, setClientId] = useState(initialClientId || clients[0]?.id || "");
   const [documentType, setDocumentType] = useState<ClientDocumentType>("convention");
+  const [caseType, setCaseType] = useState<ImmigrationCaseType>("visa_visiteur");
   const [options, setOptions] = useState<DocumentGenerationOptions>(defaultOptions);
   const [documents, setDocuments] = useState(initialDocuments);
   const [feedback, setFeedback] = useState("");
@@ -47,6 +47,9 @@ export function DocumentsManager({
 
   const selectedClient = useMemo(() => clients.find((client) => client.id === clientId) || null, [clients, clientId]);
   const selectedDocument = documentLibrary.find((document) => document.type === documentType);
+  const recommendedTypes=caseDocumentRecommendations[caseType];
+  const recommendedDocuments=documentLibrary.filter(document=>recommendedTypes.includes(document.type));
+  const otherDocuments=documentLibrary.filter(document=>!recommendedTypes.includes(document.type));
   const filteredDocuments = useMemo(
     () => (clientId ? documents.filter((document) => document.client_id === clientId) : documents),
     [clientId, documents],
@@ -72,7 +75,7 @@ export function DocumentsManager({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ client_id: clientId, document_type: documentType, included_information: options }),
+      body: JSON.stringify({ client_id: clientId, document_type: documentType, included_information: { ...options, caseType } }),
     });
     const result = (await response.json().catch(() => ({}))) as { document?: GeneratedDocument; message?: string };
     setLoading(false);
@@ -125,19 +128,38 @@ export function DocumentsManager({
           </label>
 
           <label className="block text-sm font-bold text-navy/70">
+            Type de dossier
+            <select value={caseType} onChange={(event)=>{const value=event.target.value as ImmigrationCaseType;setCaseType(value);setDocumentType("convention");}} className="mt-2 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold">
+              {(Object.entries(immigrationCaseLabels) as [ImmigrationCaseType,string][]).map(([value,label])=><option key={value} value={value}>{label}</option>)}
+            </select>
+            <span className="mt-2 block text-xs font-semibold text-navy/45">La documentation recommandée est adaptée automatiquement à ce type de dossier.</span>
+          </label>
+
+          <label className="block text-sm font-bold text-navy/70">
             Type de document
             <select
               value={documentType}
               onChange={(event) => setDocumentType(event.target.value as ClientDocumentType)}
               className="mt-2 w-full rounded-2xl border border-navy/10 bg-ivory px-4 py-3 text-navy outline-none focus:border-gold"
             >
-              {documentLibrary.map((document) => (
+              <optgroup label={`Recommandés — ${immigrationCaseLabels[caseType]}`}>
+              {recommendedDocuments.map((document) => (
                 <option key={document.type} value={document.type}>
                   {document.label}
                 </option>
               ))}
+              </optgroup>
+              <optgroup label="Autres modèles disponibles">
+              {otherDocuments.map((document) => <option key={document.type} value={document.type}>{document.label}</option>)}
+              </optgroup>
             </select>
           </label>
+
+          <div className="rounded-2xl border border-navy/10 bg-ivory p-4">
+            <p className="text-xs font-black uppercase tracking-[.16em] text-canada">Documentation recommandée</p>
+            <div className="mt-3 flex flex-wrap gap-2">{recommendedDocuments.map(document=><button type="button" key={document.type} onClick={()=>setDocumentType(document.type)} className={`rounded-full px-3 py-2 text-xs font-black transition ${document.type===documentType?"bg-navy text-white":"bg-white text-navy hover:bg-gold/25"}`}>{document.label}</button>)}</div>
+            <p className="mt-3 text-xs leading-5 text-navy/50">Les questionnaires intelligents du client et du garant restent accessibles depuis la fiche client et complètent automatiquement ces documents.</p>
+          </div>
 
           <div className="rounded-[1.5rem] bg-navy p-5 text-white">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-gold">Informations à inclure</p>
@@ -154,6 +176,9 @@ export function DocumentsManager({
                 </label>
               ))}
             </div>
+            <p className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-xs font-bold leading-6 text-white/85">
+              Les signatures officielles, la date, le cachet, le QR Code et l’empreinte d’authenticité sont toujours ajoutés automatiquement.
+            </p>
           </div>
 
           {selectedClient || selectedDocument ? (

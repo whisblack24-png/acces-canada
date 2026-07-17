@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import QRCode from "qrcode";
-import type { Appointment } from "./booking-shared";
-import { consultationModeLabels, consultationTypes, formatDateTimeFr } from "./booking-shared";
-import { formatCountryName, formatDateFr, formatPhoneNumber, formatProperName, formatUsd } from "./format";
-import { brand } from "./site";
+import type { Appointment } from "./booking-shared.ts";
+import { consultationModeLabels, consultationTypes, formatDateTimeFr } from "./booking-shared.ts";
+import { formatCountryName, formatDateFr, formatPhoneNumber, formatProperName, formatUsd } from "./format.ts";
+import { brand } from "./site.ts";
+import { companySignatureCommands, officialSealCommands, watermarkCommands } from "./document-branding.ts";
 
 const PAGE_WIDTH = 595;
 const PAGE_HEIGHT = 842;
@@ -40,10 +41,10 @@ function line(x1: number, y1: number, x2: number, y2: number, color: string, wid
   return `q ${color} RG ${width} w ${x1} ${y1} m ${x2} ${y2} l S Q\n`;
 }
 
-function labelValue(label: string, value: string, x: number, y: number, width = 210) {
+function labelValue(label: string, value: string, x: number, y: number, width = 210, valueSize = 10.5) {
   return [
     text(label.toUpperCase(), x, y, 7.5, "F2", MUTED),
-    text(value, x, y - 17, 10.5, "F2", INK),
+    text(value, x, y - 17, valueSize, "F2", INK),
     line(x, y - 27, x + width, y - 27, "0.890 0.900 0.910", 0.6),
   ].join("");
 }
@@ -168,13 +169,12 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   const country = formatCountryName(appointment.client_country);
   const amount = formatUsd(appointment.amount_cents / 100);
   const method = paymentMethodLabel(appointment.payment_method_label);
-  const transaction = appointment.stripe_payment_intent || appointment.stripe_session_id;
-  const compactTransaction = transaction.length > 34 ? `${transaction.slice(0, 18)}…${transaction.slice(-10)}` : transaction;
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || "https://acces-canada.vercel.app").replace(/\/$/, "");
   const verificationUrl = `${siteUrl}/facture/verifier/${encodeURIComponent(appointment.stripe_session_id)}`;
   const content: string[] = [];
 
   content.push(rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, "1 1 1"));
+  content.push(watermarkCommands(PAGE_WIDTH, PAGE_HEIGHT));
   content.push(rect(0, 632, PAGE_WIDTH, 210, NAVY));
   content.push(rect(0, 626, PAGE_WIDTH, 6, GOLD));
   content.push(rect(30, 718, 98, 98, "1 1 1", 15));
@@ -199,7 +199,7 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   content.push(text("C", 59, 495, 9, "F2", "1 1 1"));
   content.push(text("CLIENT", 84, 495, 8, "F2", RED));
   content.push(text(clientName, 50, 461, 15, "F2", NAVY));
-  content.push(labelValue("Courriel", appointment.client_email, 50, 433, 220));
+  content.push(labelValue("Courriel", appointment.client_email, 50, 433, 220, appointment.client_email.length > 34 ? 7.5 : 10.5));
   content.push(labelValue("Téléphone", phone, 50, 386, 102));
   content.push(labelValue("Pays", country, 168, 386, 102));
 
@@ -226,15 +226,16 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   content.push(rect(34, 106, 5, 22, RED, 2));
   content.push(text("Référence de réservation", 52, 121, 7.5, "F2", "0.650 0.700 0.760"));
   content.push(text(appointment.booking_reference, 52, 101, 11, "F2", "1 1 1"));
-  content.push(text("INFORMATIONS TECHNIQUES", 250, 125, 6.5, "F2", "0.650 0.700 0.760"));
-  content.push(text("Référence Stripe", 250, 110, 6.5, "F1", "0.650 0.700 0.760"));
-  content.push(text(compactTransaction, 250, 96, 6.5, "F1", "0.900 0.920 0.950"));
+  content.push(rect(236, 70, 145, 67, IVORY, 8));
+  content.push(companySignatureCommands("director", 246, 79, 125));
+  content.push(officialSealCommands(397, 72, 78, false));
   content.push(qrCode(verificationUrl, 493, 84, 58));
   content.push(text("VÉRIFIER", 505, 72, 6, "F2", GOLD));
   content.push(line(34, 62, 561, 62, "0.180 0.240 0.320", 0.8));
   content.push(text(`${brand.phone}   •   ${brand.email}`, 34, 42, 8, "F1", "0.800 0.830 0.870"));
   content.push(text("Canada et international", 428, 42, 8, "F2", GOLD));
   content.push(text("Document électronique officiel émis par Accès Canada. Cette facture fait foi de paiement.", 34, 20, 7, "F1", "0.500 0.560 0.640"));
+  content.push(text("1 / 1", 536, 20, 6.5, "F2", GOLD));
 
   const builder = new PdfBuilder();
   builder.object(1, "<< /Type /Catalog /Pages 2 0 R >>");

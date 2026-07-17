@@ -9,6 +9,7 @@ import type {
   QuestionnaireAnswers,
   QuestionnaireRecord,
 } from "./questionnaires.ts";
+import { companySignatureCommands, officialSealCommands, pdfText, premiumFooterCommands, qrCodeCommands, verificationUrl, watermarkCommands } from "./document-branding.ts";
 
 type ClientPdfInfo = { fullName: string; fileReference?: string | null };
 const NAVY = "0.043 0.114 0.212",
@@ -165,13 +166,20 @@ export function generateQuestionnairePdf(
       answerBox(field.label, answers[field.key]);
     y -= 8;
   }
+  ensure(105);
+  page().push(pdfText("VALIDATION ACCÈS CANADA", 42, y, 8, "F2", NAVY), companySignatureCommands("director", 42, y - 82, 150));
+  y -= 105;
   const total = pages.length;
+  const documentNumber = `AC-Q-${row.id.slice(0, 8).toUpperCase()}`;
   pages.forEach((commands, index) => {
     commands.unshift(
+      watermarkCommands(),
       `q ${NAVY} rg 0 688 612 104 re f Q\nq ${GOLD} rg 0 684 612 4 re f Q\nq 54 0 0 54 38 714 cm /Logo Do Q\nBT /F2 18 Tf 1 1 1 rg 108 752 Td (ACCES CANADA) Tj ET\nBT /F1 9 Tf ${GOLD} rg 108 735 Td (${safe(questionnaireLabels[row.questionnaire_type])}) Tj ET\nBT /F2 10 Tf ${NAVY} rg 38 664 Td (${safe(client.fullName)}) Tj ET\nBT /F1 8 Tf ${INK} rg 38 649 Td (Reference: ${safe(client.fileReference || "Non renseignee")}) Tj ET\nBT /F1 8 Tf ${INK} rg 310 664 Td (Statut: ${safe(row.status === "completed" ? "Complete" : row.status === "in_progress" ? "En cours" : "Brouillon")}  |  Progression: ${row.progress_percent} %) Tj ET\nBT /F1 7.5 Tf ${INK} rg 310 649 Td (Cree: ${safe(date(row.created_at))}  |  Modifie: ${safe(date(row.updated_at))}) Tj ET\nBT /F1 7.5 Tf ${INK} rg 310 636 Td (Complete: ${safe(date(row.submitted_at))}) Tj ET\n`,
     );
     commands.push(
-      `q ${GOLD} rg 36 53 540 1 re f Q\nBT /F2 7.5 Tf ${NAVY} rg 36 36 Td (Document confidentiel - Acces Canada) Tj ET\nBT /F1 7.5 Tf ${INK} rg 500 36 Td (Page ${index + 1} / ${total}) Tj ET\n`,
+      officialSealCommands(472, 72, 86, false),
+      premiumFooterCommands({ documentNumber }, index + 1, total),
+      qrCodeCommands(verificationUrl(), 540, 8, 42),
     );
   });
   const logo = pngRgb(join(process.cwd(), "public", "images", "logo.png"));

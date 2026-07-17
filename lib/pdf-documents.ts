@@ -2,6 +2,8 @@
 import { serviceLabels, statusLabels } from "@/lib/admin-data";
 import { formatDateFr, formatUsd } from "@/lib/format";
 import type { QuestionnaireAnswers } from "@/lib/questionnaires";
+import { BrandedPdfBuilder, clientSignaturePlaceholder, companySignatureCommands, documentDate, officialSealCommands, pdfLine, pdfRect, pdfText, premiumFooterCommands, watermarkCommands, type DocumentBrandMetadata } from "@/lib/document-branding";
+import { digitalSignatureCertificateCommands } from "@/lib/document-branding";
 
 export type QuestionnaireDocumentData = { client?: QuestionnaireAnswers; guarantor?: QuestionnaireAnswers };
 
@@ -13,7 +15,13 @@ export type ClientDocumentType =
   | "lettre-explicative"
   | "lettre-soutien-financier"
   | "lettre-invitation"
+  | "procuration"
+  | "lettre-autorisation"
   | "recu-paiement";
+
+export type ImmigrationCaseType = "visa_visiteur" | "permis_etudes" | "permis_travail" | "residence_permanente" | "parrainage" | "citoyennete" | "demande_asile" | "renouvellement" | "autre";
+
+export const immigrationCaseLabels:Record<ImmigrationCaseType,string>={visa_visiteur:"Visa visiteur",permis_etudes:"Permis d’études",permis_travail:"Permis de travail",residence_permanente:"Résidence permanente",parrainage:"Parrainage",citoyennete:"Citoyenneté",demande_asile:"Demande d’asile",renouvellement:"Renouvellement",autre:"Autre"};
 
 export type DocumentGenerationOptions = {
   includePersonalInfo?: boolean;
@@ -23,21 +31,24 @@ export type DocumentGenerationOptions = {
   includeNotes?: boolean;
   includePayments?: boolean;
   includeSignatures?: boolean;
+  caseType?: ImmigrationCaseType;
 };
 
 export const documentLabels: Record<ClientDocumentType, string> = {
-  convention: "Convention de services",
+  convention: "Convention de services Accès Canada",
   "reconnaissance-dette": "Reconnaissance de dette",
   "checklist-visa": "Liste de vérification visa visiteur",
   facture: "Facture client",
   "lettre-explicative": "Lettre explicative",
   "lettre-soutien-financier": "Lettre de soutien financier",
   "lettre-invitation": "Lettre d'invitation",
+  procuration: "Procuration administrative",
+  "lettre-autorisation": "Lettre d'autorisation",
   "recu-paiement": "Reçu de paiement",
 };
 
 export const documentLibrary: { type: ClientDocumentType; label: string; description: string }[] = [
-  { type: "convention", label: documentLabels.convention, description: "Cadre professionnel de prestation et responsabilités." },
+  { type: "convention", label: documentLabels.convention, description: "Contrat officiel complet entre Accès Canada et le client." },
   { type: "facture", label: documentLabels.facture, description: "Facturation client avec montant, taxes et statut." },
   { type: "recu-paiement", label: documentLabels["recu-paiement"], description: "Preuve de paiement professionnelle pour le client." },
   { type: "reconnaissance-dette", label: documentLabels["reconnaissance-dette"], description: "Modalités de paiement et engagement financier." },
@@ -49,7 +60,22 @@ export const documentLibrary: { type: ClientDocumentType; label: string; descrip
     description: "Modèle de soutien financier adapté au dossier client.",
   },
   { type: "lettre-invitation", label: documentLabels["lettre-invitation"], description: "Lettre d'invitation pour visite temporaire au Canada." },
+  { type: "procuration", label: documentLabels.procuration, description: "Autorisation limitée pour les démarches administratives prévues au mandat." },
+  { type: "lettre-autorisation", label: documentLabels["lettre-autorisation"], description: "Autorisation écrite de communiquer ou d’agir selon les limites convenues." },
 ];
+
+const coreDocuments:ClientDocumentType[]=["convention","checklist-visa","facture","recu-paiement","procuration","lettre-autorisation"];
+export const caseDocumentRecommendations:Record<ImmigrationCaseType,ClientDocumentType[]>={
+  visa_visiteur:[...coreDocuments,"lettre-explicative","lettre-soutien-financier","lettre-invitation"],
+  permis_etudes:[...coreDocuments,"lettre-explicative","lettre-soutien-financier"],
+  permis_travail:[...coreDocuments,"lettre-explicative"],
+  residence_permanente:[...coreDocuments,"lettre-explicative"],
+  parrainage:[...coreDocuments,"lettre-explicative","lettre-soutien-financier","lettre-invitation"],
+  citoyennete:[...coreDocuments,"lettre-explicative"],
+  demande_asile:[...coreDocuments,"lettre-explicative"],
+  renouvellement:[...coreDocuments,"lettre-explicative"],
+  autre:[...coreDocuments,"lettre-explicative"],
+};
 
 function safe(value: string | number | null | undefined) {
   return String(value ?? "")
@@ -107,14 +133,7 @@ function notesRows(client: AdminClient, options: DocumentGenerationOptions) {
 }
 
 function signatureRows(options: DocumentGenerationOptions) {
-  return options.includeSignatures === false
-    ? []
-    : ([
-        ["section", "Signatures"],
-        ["Client", "Signature: ____________________________   Date: ____________"],
-        ["Accès Canada", "Christian Nkuli Mboyo, Directeur général - Accès Canada"],
-        ["Signature", "Signature: ____________________________   Date: ____________"],
-      ] as [string, string][]);
+  return options.includeSignatures === false ? [] : [];
 }
 
 function answer(data: QuestionnaireAnswers | undefined, key: string, fallback = "Non renseigné") {
@@ -141,18 +160,42 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
 
   if (type === "convention") {
     return [
-      ["section", "Informations du dossier"],
+      ["section", "Parties à la convention"],
       ...baseInfo(client, settings),
-      ["section", "Objet de la convention"],
+      ["Agence", "Accès Canada"],
+      ["Direction", "Christian Nkuli Mboyo, Directeur général"],
+      ["Téléphone", "+1 819 266 8420"],
+      ["Courriel", "accesc625@gmail.com"],
+      ["section", "Description détaillée du mandat"],
       [
         "Texte",
-        `Accès Canada accompagne ${client.full_name} dans la préparation de sa demande de ${serviceLabels[client.service as ServiceType] || client.service}. Objet déclaré : ${answer(principal, "travel_purpose", "préparation administrative du dossier d'immigration")}. Les décisions finales relèvent exclusivement des autorités canadiennes.`,
+        `Le client confie à Accès Canada un mandat d'accompagnement administratif relatif à sa demande de ${serviceLabels[client.service as ServiceType] || client.service}. Le mandat comprend l'organisation des renseignements, la vérification de la cohérence documentaire, la préparation des formulaires et documents convenus ainsi que le suivi administratif du dossier. Objet déclaré : ${answer(principal, "travel_purpose", "préparation administrative du dossier d'immigration")}. Toute décision finale relève exclusivement des autorités canadiennes.`,
       ],
       ["Dates prévues", `${answer(principal, "arrival_date")} au ${answer(principal, "departure_date")}`],
       ["Financement", answer(principal, "funding_source")],
-      ["section", "Engagements"],
-      ["Texte", "Le client s'engage à fournir des renseignements exacts, complets et vérifiables."],
-      ["Texte", "Accès Canada assure un suivi professionnel, confidentiel et conforme aux informations communiquées."],
+      ["section", "Services inclus"],
+      ["Texte", "Ouverture et organisation du dossier; analyse administrative des renseignements transmis; liste personnalisée des pièces; préparation des documents convenus; communications de suivi; contrôle final de cohérence avant remise ou dépôt lorsque ce service est expressément prévu."],
+      ["Texte", "Les traductions, frais gouvernementaux, examens médicaux, données biométriques, services de tiers et débours non expressément indiqués ne sont pas inclus."],
+      ["section", "Honoraires et modalités de paiement"],
+      ["Honoraires convenus", money(client.paid_amount)],
+      ["Texte", "Les honoraires sont payables selon l'échéancier communiqué au client. Les frais gouvernementaux et débours sont distincts. Tout retard peut suspendre les travaux jusqu'à régularisation, sans prolonger les délais imposés par une autorité."],
+      ["section", "Responsabilités du client"],
+      ["Texte", "Le client fournit rapidement des renseignements exacts, complets, authentiques et vérifiables; signale tout changement important; relit les documents préparés; respecte les échéances et conserve ses coordonnées à jour."],
+      ["section", "Responsabilités d'Accès Canada"],
+      ["Texte", "Accès Canada exécute le mandat avec diligence, communique les étapes importantes, protège les renseignements confiés et informe le client des éléments manquants ou incohérents identifiés. Aucun résultat ni délai gouvernemental ne peut être garanti."],
+      ["section", "Confidentialité et renseignements personnels"],
+      ["Texte", "Les renseignements personnels sont utilisés uniquement pour l'exécution du mandat, la gestion du dossier, la facturation et les obligations légales. Ils ne sont accessibles qu'aux personnes autorisées et aux fournisseurs nécessaires soumis à des mesures de confidentialité et de sécurité."],
+      ["section", "Annulation et remboursement"],
+      ["Texte", "Le client peut mettre fin au mandat par écrit. Les travaux déjà exécutés, frais engagés et débours demeurent exigibles. Tout remboursement éventuel est calculé selon les services non encore rendus et les conditions particulières acceptées, sous réserve des règles applicables."],
+      ["section", "Durée du mandat"],
+      ["Texte", "La convention prend effet à sa date de génération et demeure en vigueur jusqu'à l'accomplissement des services convenus, sa résiliation écrite ou la fermeture administrative du dossier."],
+      ["section", "Consentements"],
+      ["Traitement des renseignements", "Le client consent à la collecte, à l'utilisation, à la conservation et à la communication limitée de ses renseignements personnels pour l'exécution du mandat, conformément aux lois canadiennes applicables en matière de protection des renseignements personnels."],
+      ["Communications électroniques", "Le client consent à recevoir par courriel, portail sécurisé ou autre moyen électronique convenu les avis, documents, demandes de renseignements, factures et communications liés à son dossier."],
+      ["section", "Conditions générales"],
+      ["Texte", "La présente convention constitue l'entente relative au mandat décrit. Toute modification importante doit être constatée par écrit. Si une clause est déclarée inapplicable, les autres demeurent en vigueur. Le droit applicable est celui de la province où Accès Canada exerce ses activités, sous réserve des règles impératives."],
+      ["section", "Acceptation"],
+      ["Texte", "En signant, le client confirme avoir lu et compris la présente convention, avoir pu poser ses questions et accepter les conditions du mandat."],
       ...notesRows(client, settings),
       ...signatureRows(settings),
     ];
@@ -250,6 +293,10 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
     ];
   }
 
+  if(type==="procuration")return [["section","Mandant"],...baseInfo(client,settings),["section","Mandataire"],["Organisation","Accès Canada"],["Représentant autorisé","Christian Nkuli Mboyo, Directeur général"],["section","Étendue de la procuration"],["Texte","Le client autorise Accès Canada, dans les limites du mandat convenu, à préparer, recevoir, transmettre et organiser les communications et documents administratifs nécessaires au dossier. Cette procuration ne permet aucune déclaration inexacte et peut être révoquée par écrit."],["Durée", "Valide pendant la durée du mandat, sauf révocation écrite antérieure."]];
+
+  if(type==="lettre-autorisation")return [["section","Personne concernée"],...baseInfo(client,settings),["section","Autorisation"],["Texte","Le client autorise Accès Canada à communiquer avec les personnes, organismes et fournisseurs expressément nécessaires à l’exécution du mandat, et à leur transmettre uniquement les renseignements pertinents dans le respect de la confidentialité et des lois applicables."],["Limites","L’autorisation est limitée au dossier identifié et peut être retirée par écrit, sous réserve des actions déjà effectuées."]];
+
   if (type === "recu-paiement") {
     return [
       ["Reçu", `RECU-${client.id.slice(0, 8).toUpperCase()}`],
@@ -284,76 +331,30 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
   ];
 }
 
-function writeObject(parts: string[], index: number, body: string, offsets: number[]) {
-  offsets[index] = parts.join("").length;
-  parts.push(`${index} 0 obj\n${body}\nendobj\n`);
-}
-
-export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}, questionnaireData: QuestionnaireDocumentData = {}) {
+export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}, questionnaireData: QuestionnaireDocumentData = {}, metadata: Partial<DocumentBrandMetadata> = {}) {
   const title = documentLabels[type];
   const rows = linesFor(client, type, options, questionnaireData);
-  const content: string[] = [];
-  let y = 760;
-
-  content.push("q 0.98 0.965 0.925 rg 0 0 612 792 re f Q\n");
-  content.push("q 0.043 0.114 0.212 rg 0 720 612 72 re f Q\n");
-  content.push("q 0.831 0.686 0.216 rg 36 706 540 3 re f Q\n");
-  content.push("q 0.831 0.686 0.216 rg 36 734 46 46 re f Q\n");
-  content.push("q 0.8 0.063 0.18 rg 42 740 34 34 re f Q\n");
-  content.push("BT /F2 16 Tf 1 1 1 rg 48 752 Td (AC) Tj ET\n");
-  content.push("BT /F2 21 Tf 1 1 1 rg 96 756 Td (ACCÈS CANADA) Tj ET\n");
-  content.push("BT /F1 9 Tf 1 1 1 rg 96 738 Td (Votre chemin vers le Canada, notre engagement.) Tj ET\n");
-  content.push("BT /F1 8 Tf 1 1 1 rg 390 756 Td (+1 819-266-8420) Tj ET\n");
-  content.push("BT /F1 8 Tf 1 1 1 rg 390 742 Td (accesc625@gmail.com) Tj ET\n");
-  content.push(`BT /F2 19 Tf 0.043 0.114 0.212 rg 36 682 Td (${safe(title)}) Tj ET\n`);
-  content.push(`BT /F1 10 Tf 0.2 0.2 0.2 rg 36 664 Td (${safe(`Généré le ${dateFr(new Date().toISOString())}`)}) Tj ET\n`);
-  content.push(`BT /F2 10 Tf 0.8 0.063 0.18 rg 390 664 Td (${safe(client.file_reference || "Référence à créer")}) Tj ET\n`);
-  y = 628;
-
+  const meta:DocumentBrandMetadata={documentNumber:metadata.documentNumber||`AC-DOC-${client.id.slice(0,8).toUpperCase()}`,verificationToken:metadata.verificationToken||null,authenticityHash:metadata.authenticityHash||null,version:metadata.version||1,status:metadata.status||"active",createdAt:metadata.createdAt||new Date().toISOString(),digitallySigned:metadata.digitallySigned!==false};
+  const pages:string[][]=[];let content:string[]=[];let y=610;
+  const beginPage=()=>{content=[watermarkCommands(),pdfRect(0,700,612,92,"0.051 0.106 0.165"),pdfRect(0,696,612,4,"0.831 0.686 0.216"),pdfRect(34,724,48,48,"0.831 0.686 0.216"),pdfRect(40,730,36,36,"0.816 0 0"),pdfText("AC",46,742,14,"F2","1 1 1"),pdfText("ACCÈS CANADA",98,752,20,"F2","1 1 1"),pdfText("Votre chemin vers le Canada, notre engagement.",98,735,8.5,"F1","1 1 1"),pdfText(title,36,666,18,"F2","0.051 0.106 0.165"),pdfText(`Créé le ${documentDate(meta.createdAt)}  |  Version ${meta.version}`,36,648,9,"F1","0.390 0.425 0.470"),pdfText(meta.documentNumber,420,648,8.5,"F2","0.816 0 0")];y=610;};
+  const finishPage=()=>{pages.push(content);beginPage();};beginPage();
+  const ensure=(height:number)=>{if(y-height<108)finishPage();};
   rows.forEach(([label, value]) => {
     if (label === "section") {
-      y -= 12;
-      content.push(`q 0.831 0.686 0.216 rg 36 ${y + 11} 180 1.5 re f Q\n`);
-      content.push(`BT /F2 13 Tf 0.043 0.114 0.212 rg 36 ${y} Td (${safe(value)}) Tj ET\n`);
-      y -= 28;
+      ensure(40);y-=8;content.push(pdfLine(36,y+11,216,y+11,"0.831 0.686 0.216",1.5),pdfText(value,36,y,12,"F2","0.051 0.106 0.165"));y-=25;
       return;
     }
-
-    const wrapped = safe(value).match(/.{1,74}(\s|$)|.{1,74}/g) || [safe(value)];
-    content.push(`q 1 1 1 rg 36 ${y - Math.max(14, wrapped.length * 13) - 8} 540 ${Math.max(24, wrapped.length * 13 + 11)} re f Q\n`);
-    content.push(`BT /F2 9 Tf 0.043 0.114 0.212 rg 36 ${y} Td (${safe(label)}) Tj ET\n`);
-    wrapped.forEach((line, index) => {
-      content.push(`BT /F1 10 Tf 0.12 0.12 0.12 rg 180 ${y - index * 13} Td (${line.trim()}) Tj ET\n`);
-    });
-    y -= Math.max(23, wrapped.length * 14 + 8);
+    const wrapped=safe(value).match(/.{1,66}(\s|$)|.{1,66}/g)||[safe(value)],height=Math.max(28,wrapped.length*13+14);ensure(height);content.push(pdfRect(36,y-height+8,540,height,"1 1 1"),pdfText(label,48,y-7,8,"F2","0.051 0.106 0.165"));wrapped.forEach((line,index)=>content.push(pdfText(line.trim(),176,y-7-index*12,9,"F1","0.105 0.133 0.170")));y-=height+5;
   });
-
-  content.push("q 0.8 0.063 0.18 rg 36 45 540 1 re f Q\n");
-  content.push("BT /F1 8 Tf 0.3 0.3 0.3 rg 36 30 Td (+1 819-266-8420  |  accesc625@gmail.com) Tj ET\n");
-
-  const stream = content.join("");
-  const parts = ["%PDF-1.4\n"];
-  const offsets = [0];
-  writeObject(parts, 1, "<< /Type /Catalog /Pages 2 0 R >>", offsets);
-  writeObject(parts, 2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", offsets);
-  writeObject(
-    parts,
-    3,
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
-    offsets,
-  );
-  writeObject(parts, 4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>", offsets);
-  writeObject(parts, 5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>", offsets);
-  writeObject(parts, 6, `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`, offsets);
-
-  const xref = parts.join("").length;
-  parts.push(`xref\n0 7\n0000000000 65535 f \n`);
-  for (let index = 1; index <= 6; index += 1) {
-    parts.push(`${String(offsets[index]).padStart(10, "0")} 00000 n \n`);
-  }
-  parts.push(`trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
-
-  return Buffer.from(parts.join(""), "latin1");
+  ensure(220);
+  content.push(pdfText("VALIDATION ET SIGNATURES",36,y,10,"F2","0.816 0 0"));
+  y-=105;
+  content.push(companySignatureCommands("director",36,y,170));
+  const needsCounsel=["convention","lettre-explicative","lettre-soutien-financier","lettre-invitation"].includes(type);
+  if(needsCounsel)content.push(companySignatureCommands("counsel",220,y,170));
+  content.push(clientSignaturePlaceholder(410,y,150));
+  content.push(digitalSignatureCertificateCommands(meta,36,y-76,540));
+  pages.push(content);const builder=new BrandedPdfBuilder();pages.forEach((commands,index)=>builder.addPage(commands.join("")+officialSealCommands(470,76,92,meta.digitallySigned)+premiumFooterCommands(meta,index+1,pages.length)));return builder.finish();
 }
 
 export function isClientDocumentType(type: string): type is ClientDocumentType {

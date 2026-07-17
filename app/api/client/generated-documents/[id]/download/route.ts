@@ -23,7 +23,7 @@ export async function GET(_request: Request, context: Context) {
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) return NextResponse.json({ message: "Client introuvable." }, { status: 404 });
 
-  const pdf = generateClientPdf(client, document.document_type, document.included_information || {});
+  const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, {}, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true });
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
