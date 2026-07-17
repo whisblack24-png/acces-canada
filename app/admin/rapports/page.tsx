@@ -7,7 +7,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { listClients, serviceLabels, statusLabels } from "@/lib/admin-data";
 import type { ServiceType } from "@/lib/admin-data";
 import { buildAdminReport, type ReportRow } from "@/lib/admin-reports";
-import { formatDateFr, formatMoney } from "@/lib/format";
+import { formatDateFr, formatUsd } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Rapports",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 function money(value: number) {
-  return formatMoney(value);
+  return formatUsd(value);
 }
 
 function MetricCard({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {

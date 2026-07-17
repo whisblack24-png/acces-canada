@@ -9,7 +9,7 @@ import {
   type Appointment,
   type AppointmentStatus,
 } from "@/lib/booking-shared";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 
 const statusLabels: Record<AppointmentStatus, string> = {
   confirmed: "Confirmé",
@@ -104,7 +104,7 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
         <Stat label="Rendez-vous actifs" value={String(stats.active)} icon={<CalendarClock className="h-5 w-5" />} />
         <Stat label="À venir" value={String(stats.upcoming)} icon={<CreditCard className="h-5 w-5" />} />
         <Stat label="Annulés" value={String(stats.cancelled)} icon={<CalendarX2 className="h-5 w-5" />} />
-        <Stat label="Revenus actifs" value={`${formatMoney(stats.revenue)} USD`} icon={<ReceiptText className="h-5 w-5" />} />
+        <Stat label="Revenus actifs" value={formatUsd(stats.revenue)} icon={<ReceiptText className="h-5 w-5" />} />
       </section>
 
       <section className="rounded-[2rem] bg-white p-5 shadow-premium md:p-7">
@@ -174,9 +174,12 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
                   {consultationTypes[appointment.consultation_type].label} · {consultationModeLabels[appointment.consultation_mode]}
                 </span>
                 <span className="mt-1 block text-xs font-black text-canada">{statusLabels[appointment.status]}</span>
+                {appointment.stripe_session_id.startsWith("cs_test_") ? <span className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase text-amber-800">Donnée de test Stripe</span> : null}
+                {appointment.status === "cancelled" && appointment.cancelled_at ? <span className="mt-2 block text-xs text-navy/45">Annulé le {formatDateTimeFr(appointment.cancelled_at)}</span> : null}
+                {appointment.status === "cancelled" && appointment.cancellation_reason ? <span className="mt-1 block text-xs text-navy/55">Motif : {appointment.cancellation_reason}</span> : null}
               </span>
               <span>
-                <span className="block font-black text-navy">{formatMoney(appointment.amount_cents / 100)} USD</span>
+                <span className="block font-black text-navy">{formatUsd(appointment.amount_cents / 100)}</span>
                 <span className="mt-1 block text-xs text-navy/45">{appointment.stripe_payment_intent || appointment.stripe_session_id}</span>
               </span>
               <span>{appointment.booking_reference}</span>
@@ -211,7 +214,8 @@ export function AppointmentsManager({ initialAppointments }: { initialAppointmen
                   disabled={busyId === appointment.id || appointment.status === "cancelled"}
                   onClick={() => {
                     if (window.confirm(`Annuler le rendez-vous ${appointment.booking_reference} ? La facture et l’historique seront conservés.`)) {
-                      void action(appointment.id, { action: "cancel" });
+                      const reason = window.prompt("Raison de l’annulation (conservée dans l’historique) :", "Annulation demandée par le client");
+                      if (reason?.trim()) void action(appointment.id, { action: "cancel", reason: reason.trim() });
                     }
                   }}
                   className="inline-flex min-h-10 items-center gap-2 bg-canada px-3 text-xs font-black text-white disabled:opacity-40"

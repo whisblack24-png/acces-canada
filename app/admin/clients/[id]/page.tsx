@@ -18,7 +18,7 @@ import { listGeneratedDocumentsForClient } from "@/lib/admin-documents";
 import { listClientMessages, listClientUploads } from "@/lib/client-portal";
 import { formatDateTimeFr, listAppointmentsForEmail } from "@/lib/booking";
 import { listClientPayments } from "@/lib/production-workflow";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
@@ -167,7 +167,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
             </Panel>
 
             <Panel title="Paiements" icon={<CreditCard className="h-5 w-5" />}>
-              {payments.length ? payments.map((payment) => <div key={payment.id} className="flex items-center justify-between rounded-2xl bg-ivory p-4"><span><span className="block font-black">{payment.description}</span><span className="text-xs text-navy/45">{dateFr(payment.created_at)} · {payment.status}</span></span><strong>{formatMoney(payment.amount_cents / 100)} $</strong></div>) : <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun paiement complémentaire.</p>}
+              {payments.length ? payments.map((payment) => <div key={payment.id} className="flex items-center justify-between rounded-2xl bg-ivory p-4"><span><span className="block font-black">{payment.description}</span><span className="text-xs text-navy/45">{dateFr(payment.created_at)} · {payment.status}</span></span><strong>{formatUsd(payment.amount_cents / 100)}</strong></div>) : <p className="rounded-2xl bg-ivory p-4 text-sm font-bold text-navy/52">Aucun paiement complémentaire.</p>}
             </Panel>
 
             <Panel title="Messagerie sécurisée" icon={<MessageSquare className="h-5 w-5" />}>

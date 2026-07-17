@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import { CreditCard, FileSignature } from "lucide-react";
 import type { ClientPayment, ClientSignature } from "@/lib/production-workflow";
-import { formatDateFr, formatMoney } from "@/lib/format";
+import { formatDateFr, formatUsd } from "@/lib/format";
 
 export function ClientSignaturePanel({ initialSignatures }: { initialSignatures: ClientSignature[] }) {
   const [signatures, setSignatures] = useState(initialSignatures);
@@ -89,7 +89,7 @@ export function ClientPaymentPanel({ initialPayments }: { initialPayments: Clien
             <span>
               <span className="block font-black text-navy">{payment.description}</span>
               <span className="mt-1 block text-xs font-bold text-navy/48">
-                {formatMoney(payment.amount_cents / 100)} - {payment.status === "paid" ? `payé le ${formatDateFr(payment.paid_at)}` : "paiement en attente"}
+                {formatUsd(payment.amount_cents / 100)} - {payment.status === "paid" ? `payé le ${formatDateFr(payment.paid_at)}` : "paiement en attente"}
               </span>
             </span>
             {payment.status === "paid" ? (

@@ -1,6 +1,6 @@
 ﻿import type { AdminClient, ServiceType } from "@/lib/admin-data";
 import { serviceLabels, statusLabels } from "@/lib/admin-data";
-import { formatDateFr, formatMoney } from "@/lib/format";
+import { formatDateFr, formatUsd } from "@/lib/format";
 import type { QuestionnaireAnswers } from "@/lib/questionnaires";
 
 export type QuestionnaireDocumentData = { client?: QuestionnaireAnswers; guarantor?: QuestionnaireAnswers };
@@ -65,7 +65,7 @@ function dateFr(value?: string | null) {
 }
 
 function money(value: number | null | undefined) {
-  return formatMoney(value);
+  return formatUsd(value);
 }
 
 function baseInfo(client: AdminClient, options: DocumentGenerationOptions = {}) {

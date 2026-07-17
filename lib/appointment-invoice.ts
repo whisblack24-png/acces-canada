@@ -4,7 +4,7 @@ import { deflateSync, inflateSync } from "node:zlib";
 import QRCode from "qrcode";
 import type { Appointment } from "./booking-shared";
 import { consultationModeLabels, consultationTypes, formatDateTimeFr } from "./booking-shared";
-import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "./format";
+import { formatCountryName, formatDateFr, formatPhoneNumber, formatProperName, formatUsd } from "./format";
 import { brand } from "./site";
 
 const PAGE_WIDTH = 595;
@@ -166,7 +166,7 @@ export function generatePremiumAppointmentInvoicePdf(appointment: Appointment) {
   const clientName = formatProperName(appointment.client_full_name);
   const phone = formatPhoneNumber(appointment.client_phone);
   const country = formatCountryName(appointment.client_country);
-  const amount = `${formatMoney(appointment.amount_cents / 100)} US`;
+  const amount = formatUsd(appointment.amount_cents / 100);
   const method = paymentMethodLabel(appointment.payment_method_label);
   const transaction = appointment.stripe_payment_intent || appointment.stripe_session_id;
   const compactTransaction = transaction.length > 34 ? `${transaction.slice(0, 18)}…${transaction.slice(-10)}` : transaction;

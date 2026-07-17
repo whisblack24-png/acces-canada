@@ -33,6 +33,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ses
         consultationMode: consultationModeLabels[appointment.consultation_mode],
         durationMinutes: appointment.duration_minutes,
         amountCents: appointment.amount_cents,
+        currency: appointment.currency || "USD",
+        email: appointment.client_email,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

@@ -21,6 +21,10 @@ export function formatMoney(value: number | null | undefined) {
   })} $`;
 }
 
+export function formatUsd(value: number | null | undefined) {
+  return `${formatMoney(value)} US`;
+}
+
 export function formatProperName(value: string) {
   return value
     .trim()

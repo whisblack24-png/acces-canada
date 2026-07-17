@@ -1,7 +1,7 @@
 import { getClient, updateClient, type AdminClient, type ClientInput } from "@/lib/admin-data";
 import { documentLabels, type ClientDocumentType } from "@/lib/pdf-documents";
 import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
 
 export type SignatureStatus = "pending" | "signed" | "declined";
@@ -279,7 +279,7 @@ export async function createPaymentCheckout(client: AdminClient, amountCents: nu
   });
   if (!paymentResponse.ok) await supabaseError("Création paiement", paymentResponse);
 
-  await updateClient(client.id, clientToInput(client, `Lien de paiement créé: ${formatMoney(amountCents / 100)}.`));
+  await updateClient(client.id, clientToInput(client, `Lien de paiement créé: ${formatUsd(amountCents / 100)}.`));
   return ((await paymentResponse.json()) as ClientPayment[])[0];
 }
 
@@ -308,7 +308,7 @@ export async function markPaymentPaid(stripeSessionId: string, paymentIntent?: s
   const client = await getClient(updated.client_id);
   if (client) {
     await updateClient(client.id, {
-      ...clientToInput(client, `Paiement reçu: ${formatMoney(updated.amount_cents / 100)}.`),
+      ...clientToInput(client, `Paiement reçu: ${formatUsd(updated.amount_cents / 100)}.`),
       paid_amount: Number(client.paid_amount || 0) + updated.amount_cents / 100,
     });
     await notifyClient(
@@ -316,7 +316,7 @@ export async function markPaymentPaid(stripeSessionId: string, paymentIntent?: s
       "Accès Canada - paiement reçu",
       `Bonjour ${client.full_name},
 
-Votre paiement de ${formatMoney(updated.amount_cents / 100)} a bien été reçu.
+Votre paiement de ${formatUsd(updated.amount_cents / 100)} a bien été reçu.
 
 Merci pour votre confiance.
 

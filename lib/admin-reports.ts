@@ -3,7 +3,7 @@ import { dashboardStats, dossierStatuses, serviceLabels, serviceTypes, statusLab
 import { listGeneratedDocuments, type GeneratedDocument } from "@/lib/admin-documents";
 import { listAllClientUploads, type ClientUploadedDocument } from "@/lib/client-portal";
 import { brand } from "@/lib/site";
-import { formatDateFr, formatMoney } from "@/lib/format";
+import { formatDateFr, formatUsd } from "@/lib/format";
 
 export type ReportRow = {
   label: string;
@@ -49,7 +49,7 @@ function monthLabel(dateValue: string) {
 }
 
 function money(value: number) {
-  return formatMoney(value);
+  return formatUsd(value);
 }
 
 function safePdf(value: string | number | null | undefined) {

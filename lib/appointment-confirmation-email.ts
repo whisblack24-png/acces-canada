@@ -29,8 +29,8 @@ export function appointmentConfirmationEmailHtml(data: ConfirmationEmailData) {
   const detailRows = rows
     .map(
       ([label, value]) => `<tr>
-        <td style="padding:12px 0;border-bottom:1px solid #e5e9ef;color:#697586;font-size:13px;line-height:20px;width:48%;">${escapeHtml(label)}</td>
-        <td style="padding:12px 0;border-bottom:1px solid #e5e9ef;color:#0B1D36;font-size:14px;line-height:20px;font-weight:700;text-align:right;">${escapeHtml(value)}</td>
+        <td class="detail-label" style="padding:12px 8px 12px 0;border-bottom:1px solid #e5e9ef;color:#697586;font-size:13px;line-height:20px;width:48%;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(label)}</td>
+        <td class="detail-value" style="padding:12px 0 12px 8px;border-bottom:1px solid #e5e9ef;color:#0B1D36;font-size:14px;line-height:20px;font-weight:700;text-align:right;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(value)}</td>
       </tr>`,
     )
     .join("");
@@ -41,15 +41,25 @@ export function appointmentConfirmationEmailHtml(data: ConfirmationEmailData) {
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Confirmation de rendez-vous Accès Canada</title>
-<style>@media only screen and (max-width:620px){.container{width:100%!important}.mobile-pad{padding-left:20px!important;padding-right:20px!important}.column{display:block!important;width:100%!important}.button-wrap a{display:block!important;margin:0 0 10px!important;text-align:center!important}.hero-title{font-size:25px!important}.qr-cell{padding-top:20px!important;text-align:center!important}}</style></head>
+<style>
+table{border-collapse:separate}td{box-sizing:border-box}a{word-break:break-word}
+@media only screen and (max-width:620px){
+  .outer-pad{padding:12px 8px!important}.container{width:100%!important;max-width:100%!important;border-radius:10px!important}
+  .mobile-pad{padding-left:16px!important;padding-right:16px!important}.column{display:block!important;width:100%!important;max-width:100%!important}
+  .column-spacer{display:none!important}.button-wrap a{display:block!important;box-sizing:border-box!important;width:100%!important;margin:0 0 10px!important;text-align:center!important}
+  .hero-title{font-size:25px!important;line-height:32px!important}.header-label{display:block!important;padding-top:14px!important;text-align:left!important}
+  .detail-label,.detail-value{display:block!important;width:100%!important;padding:8px 0!important;text-align:left!important;border-bottom:0!important}
+  .detail-value{padding-top:0!important;padding-bottom:12px!important;border-bottom:1px solid #e5e9ef!important}.qr-cell{padding-top:4px!important;text-align:center!important}
+}
+</style></head>
 <body style="margin:0;padding:0;background-color:#eef2f6;font-family:Arial,Helvetica,sans-serif;color:#0B1D36;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Votre paiement et votre rendez-vous Accès Canada sont confirmés.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef2f6;"><tr><td align="center" style="padding:28px 12px;">
-<table role="presentation" width="620" class="container" cellpadding="0" cellspacing="0" border="0" style="width:620px;max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(11,29,54,.12);">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#eef2f6;"><tr><td class="outer-pad" align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" class="container" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:620px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(11,29,54,.12);table-layout:fixed;">
 <tr><td style="background-color:#0B1D36;background-image:linear-gradient(135deg,#0B1D36 0%,#132d50 100%);padding:30px 36px 34px;" class="mobile-pad">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
     <td valign="middle"><img src="cid:acces-canada-logo" width="96" alt="Accès Canada" style="display:block;width:96px;max-width:96px;height:auto;border:0;"></td>
-    <td valign="middle" align="right" style="color:#D4AF37;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">Confirmation officielle</td>
+    <td class="header-label" valign="middle" align="right" style="color:#D4AF37;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;word-break:break-word;">Confirmation officielle</td>
   </tr></table>
   <h1 class="hero-title" style="margin:28px 0 8px;color:#ffffff;font-size:30px;line-height:38px;font-weight:800;">Votre rendez-vous est confirmé.</h1>
   <p style="margin:0;color:#D4AF37;font-size:16px;line-height:24px;font-weight:700;">${escapeHtml(brand.slogan)}</p>
@@ -69,10 +79,10 @@ export function appointmentConfirmationEmailHtml(data: ConfirmationEmailData) {
       <div style="color:#C8102E;font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px;">Votre consultation</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${detailRows}</table>
     </td>
-    <td class="column" width="4%" style="font-size:0;">&nbsp;</td>
+    <td class="column-spacer" width="4%" style="font-size:0;">&nbsp;</td>
     <td class="column" width="38%" valign="top" style="padding:22px;background:#0B1D36;border-radius:12px;color:#ffffff;">
       <div style="color:#D4AF37;font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;">Montant payé</div>
-      <div style="font-size:26px;line-height:34px;font-weight:800;margin:8px 0 20px;">${escapeHtml(data.amount)}</div>
+      <div style="font-size:26px;line-height:34px;font-weight:800;margin:8px 0 20px;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(data.amount)}</div>
       <div style="color:#aeb9c8;font-size:11px;line-height:17px;text-transform:uppercase;">Réservation</div><div style="font-size:14px;font-weight:700;margin:3px 0 14px;">${escapeHtml(data.bookingReference)}</div>
       <div style="color:#aeb9c8;font-size:11px;line-height:17px;text-transform:uppercase;">Facture</div><div style="font-size:14px;font-weight:700;">${escapeHtml(data.invoiceNumber)}</div>
     </td>
@@ -83,6 +93,7 @@ export function appointmentConfirmationEmailHtml(data: ConfirmationEmailData) {
   ${button(data.portalUrl, "Accéder à mon espace client", "#0B1D36", "#FFFFFF")}
   ${button(data.contactUrl, "Contacter Accès Canada", "#FFFFFF", "#0B1D36")}
 </td></tr>
+<tr><td class="mobile-pad" style="padding:0 36px 22px;color:#697586;font-size:12px;line-height:19px;text-align:center;">Pour votre sécurité, le code temporaire envoyé pour accéder à votre espace client expire après 10 minutes.</td></tr>
 <tr><td class="mobile-pad" style="padding:4px 36px 32px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8fb;border-radius:12px;"><tr>
     <td class="column" valign="middle" style="padding:20px;"><div style="font-size:15px;font-weight:800;margin-bottom:6px;">Vérification rapide</div><div style="color:#697586;font-size:13px;line-height:20px;">Scannez ce code pour ouvrir votre facture sécurisée.</div></td>

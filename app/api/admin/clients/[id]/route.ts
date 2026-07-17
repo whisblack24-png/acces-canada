@@ -10,7 +10,7 @@ import {
   updateClient,
   validateClientInput,
 } from "@/lib/admin-data";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 import { notifyStatusChanged } from "@/lib/production-workflow";
 import { deleteClientStorageFiles } from "@/lib/client-portal";
 
@@ -62,7 +62,7 @@ export async function PATCH(request: Request, context: Context) {
     const changes = [
       existing?.status && existing.status !== input.status ? `Statut modifié: ${existing.status} -> ${input.status}.` : "",
       existing?.paid_amount !== undefined && Number(existing.paid_amount || 0) !== Number(input.paid_amount || 0)
-        ? `Paiement mis à jour: ${formatMoney(Number(input.paid_amount || 0))}.`
+        ? `Paiement mis à jour: ${formatUsd(Number(input.paid_amount || 0))}.`
         : "",
       existing?.documents_received?.join("|") !== input.documents_received?.join("|") ||
       existing?.documents_missing?.join("|") !== input.documents_missing?.join("|")

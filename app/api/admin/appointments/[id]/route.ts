@@ -14,7 +14,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     if (body.action === "cancel") {
-      return NextResponse.json({ appointment: await cancelAppointment(id) });
+      const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+      if (!reason) return NextResponse.json({ message: "La raison de l’annulation est obligatoire." }, { status: 400 });
+      return NextResponse.json({ appointment: await cancelAppointment(id, reason) });
     }
 
     if (body.action === "move") {

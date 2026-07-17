@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, Loader2, LogIn, Phone, Sparkles, Video, UsersRound } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, Loader2, LogIn, Mail, Phone, Sparkles, Video, UsersRound } from "lucide-react";
 import { consultationModeLabels, consultationTypes, type ConsultationMode, type ConsultationType } from "@/lib/booking-shared";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 
 type Slot = { value: string; label: string };
 type Confirmation = {
@@ -16,6 +16,8 @@ type Confirmation = {
   consultationMode?: string;
   durationMinutes?: number;
   amountCents?: number;
+  currency?: string;
+  email?: string;
 };
 
 const modes: { value: ConsultationMode; icon: typeof Phone }[] = [
@@ -44,7 +46,6 @@ export function BookingForm() {
   const [message, setMessage] = useState("");
   const [invoiceSessionId, setInvoiceSessionId] = useState("");
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
 
   const selectedType = consultationTypes[consultationType];
   const selectedSlotLabel = slots.find((slot) => slot.value === selectedSlot)?.label || "Aucun créneau sélectionné";
@@ -85,16 +86,15 @@ export function BookingForm() {
           setMessage(result.message || "Le paiement est confirmé, mais le rendez-vous ne peut pas encore être vérifié.");
           return;
         }
-        if (attempt < 15) {
-          setConfirmation({ status: "pending" });
-          timeout = setTimeout(checkStatus, 2_000);
-        } else {
-          setConfirmation({ status: "pending" });
-          setMessage("Paiement confirmé. Le traitement prend plus de temps que prévu; Stripe le retentera automatiquement.");
-        }
+        setConfirmation({ status: "pending" });
+        if (attempt >= 15) setMessage("Paiement confirmé. La préparation de votre rendez-vous prend un peu plus de temps. Cette page se met à jour automatiquement.");
+        timeout = setTimeout(checkStatus, attempt < 15 ? 2_000 : 5_000);
       } catch {
-        if (active && attempt < 15) timeout = setTimeout(checkStatus, 2_000);
-        else if (active) setConfirmation({ status: "error" });
+        if (active) {
+          setConfirmation({ status: "pending" });
+          setMessage("Paiement confirmé. Nous attendons la finalisation sécurisée de votre réservation.");
+          timeout = setTimeout(checkStatus, 5_000);
+        }
       }
     }
 
@@ -104,19 +104,6 @@ export function BookingForm() {
       if (timeout) clearTimeout(timeout);
     };
   }, [invoiceSessionId]);
-
-  useEffect(() => {
-    if (confirmation?.status !== "confirmed") return;
-    setRedirectSeconds(10);
-    const interval = window.setInterval(() => {
-      setRedirectSeconds((seconds) => (seconds === null ? null : Math.max(0, seconds - 1)));
-    }, 1_000);
-    const redirect = window.setTimeout(() => window.location.assign("/"), 10_000);
-    return () => {
-      window.clearInterval(interval);
-      window.clearTimeout(redirect);
-    };
-  }, [confirmation?.status]);
 
   useEffect(() => {
     let active = true;
@@ -210,13 +197,19 @@ export function BookingForm() {
               <div className="mx-auto mt-3 grid max-w-2xl gap-3 bg-white p-5 text-left text-sm font-bold text-navy/70 sm:grid-cols-2">
                 <Summary icon={<FileText />} label="Réservation" value={confirmation.bookingReference || "-"} />
                 <Summary icon={<FileText />} label="Facture" value={confirmation.invoiceNumber || "-"} />
-                {confirmation.startsAt ? <Summary icon={<CalendarDays />} label="Date et heure" value={new Date(confirmation.startsAt).toLocaleString("fr-CA")} /> : null}
-                <Summary icon={<Clock3 />} label="Consultation" value={`${confirmation.consultationLabel || "Consultation"} · ${confirmation.consultationMode || ""}`} />
+                <Summary icon={<Clock3 />} label="Type de consultation" value={confirmation.consultationLabel || "Consultation"} />
+                {confirmation.startsAt ? <Summary icon={<CalendarDays />} label="Date" value={new Date(confirmation.startsAt).toLocaleDateString("fr-CA", { dateStyle: "long", timeZone: "America/Toronto" })} /> : null}
+                {confirmation.startsAt ? <Summary icon={<Clock3 />} label="Heure" value={new Date(confirmation.startsAt).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto" })} /> : null}
                 <Summary icon={<Clock3 />} label="Durée" value={`${confirmation.durationMinutes || 0} minutes`} />
-                <Summary icon={<CreditCard />} label="Montant payé" value={`${formatMoney((confirmation.amountCents || 0) / 100)} US`} />
+                <Summary icon={<Video />} label="Mode" value={confirmation.consultationMode || "Non renseigné"} />
+                <Summary icon={<CreditCard />} label="Montant payé" value={formatUsd((confirmation.amountCents || 0) / 100)} />
+                <Summary icon={<Mail />} label="Courriel utilisé" value={confirmation.email || "Non renseigné"} />
               </div>
-              <p className="mt-4 text-xs font-black uppercase tracking-[0.12em] text-navy/50">
-                Redirection automatique vers l’accueil dans {redirectSeconds ?? 10} seconde{redirectSeconds === 1 ? "" : "s"}.
+              <p className="mx-auto mt-5 max-w-2xl text-sm font-bold leading-7 text-navy/70">
+                Votre paiement et votre réservation ont été enregistrés avec succès. Un courriel contenant votre confirmation, votre facture et les informations nécessaires pour accéder à votre espace client vous a été envoyé. Vous pouvez rester sur cette page ou retourner à l’accueil lorsque vous le souhaitez.
+              </p>
+              <p className="mt-3 text-xs font-black uppercase tracking-[0.12em] text-navy/50">
+                Le code d’accès au portail client expire après 10 minutes.
               </p>
             </>
           ) : (
@@ -225,14 +218,16 @@ export function BookingForm() {
 
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             {confirmation.status === "confirmed" ? (
-              <a href={`/api/booking/invoice/session/${invoiceSessionId}`} className="bg-canada px-6 py-3 text-sm font-black text-white">
-                Télécharger la facture PDF
+              <Link href="/" className="bg-canada px-6 py-3 text-sm font-black text-white">Retourner à l’accueil</Link>
+            ) : null}
+            {confirmation.status === "confirmed" ? (
+              <a href={`/api/booking/invoice/session/${invoiceSessionId}`} className="bg-white px-6 py-3 text-sm font-black text-canada ring-1 ring-canada/20">
+                Télécharger ma facture
               </a>
             ) : null}
             <Link href="/client/login" className="inline-flex items-center gap-2 bg-gold px-6 py-3 text-sm font-black text-navy">
               <LogIn className="h-4 w-4" /> Accéder à mon espace client
             </Link>
-            <Link href="/" className="border border-navy/15 bg-white px-6 py-3 text-sm font-black text-navy">Continuer vers l’accueil</Link>
           </div>
         </section>
       ) : null}
@@ -267,7 +262,7 @@ export function BookingForm() {
                 >
                   <span className="block font-black">{item.label}</span>
                   <span className="mt-2 block text-sm leading-6">{item.description}</span>
-                  <span className="mt-3 block text-lg font-black text-canada">{formatMoney(item.amountCents / 100)} USD</span>
+                  <span className="mt-3 block text-lg font-black text-canada">{formatUsd(item.amountCents / 100)}</span>
                 </button>
               );
             })}
@@ -337,7 +332,7 @@ export function BookingForm() {
             <p>{selectedType.label}</p>
             <p>{selectedSlotLabel}</p>
             <p>{consultationModeLabels[form.consultationMode]}</p>
-            <p className="text-lg font-black text-canada">{formatMoney(selectedType.amountCents / 100)} USD</p>
+            <p className="text-lg font-black text-canada">{formatUsd(selectedType.amountCents / 100)}</p>
           </div>
         </section>
 

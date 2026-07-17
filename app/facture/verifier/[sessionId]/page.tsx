@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BadgeCheck, CalendarCheck, FileCheck2, ShieldCheck } from "lucide-react";
 import { getAppointmentByStripeSession } from "@/lib/booking";
 import { consultationTypes, formatDateTimeFr } from "@/lib/booking-shared";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Vérification de facture" };
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export default async function VerifyInvoicePage({ params }: { params: Promise<{ 
               <Info icon={<FileCheck2 />} label="Facture" value={appointment.invoice_number} />
               <Info icon={<BadgeCheck />} label="Réservation" value={appointment.booking_reference} />
               <Info icon={<CalendarCheck />} label="Rendez-vous" value={formatDateTimeFr(appointment.starts_at)} />
-              <Info icon={<ShieldCheck />} label="Montant" value={`${formatMoney(appointment.amount_cents / 100)} US`} />
+              <Info icon={<ShieldCheck />} label="Montant" value={formatUsd(appointment.amount_cents / 100)} />
             </div>
             <p className="mt-6 text-sm font-bold text-navy/58">{consultationTypes[appointment.consultation_type].label}</p>
           </div>

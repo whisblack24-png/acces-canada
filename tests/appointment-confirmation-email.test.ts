@@ -33,4 +33,11 @@ test("le courriel premium contient toutes les informations et actions attendues"
   ]) {
     assert.match(html, new RegExp(expected));
   }
+
+  assert.match(html, /max-width:620px/);
+  assert.match(html, /\.detail-label,.detail-value\{display:block!important/);
+  assert.match(html, /width:100%!important;margin:0 0 10px/);
+  assert.match(html, /word-break:break-word/);
+  assert.match(html, /expire après 10 minutes/);
+  assert.doesNotMatch(html, /\$\s+\$\s*US/);
 });

@@ -8,6 +8,7 @@ export type Appointment = {
   updated_at: string | null;
   confirmed_at: string | null;
   cancelled_at: string | null;
+  cancellation_reason?: string | null;
   stripe_session_id: string;
   stripe_payment_intent: string | null;
   booking_reference: string;

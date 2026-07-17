@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Edit3, Eye, FileText, Plus, Search, Trash2, X } from "lucide-react";
 import { dossierStatuses, serviceLabels, serviceTypes, statusLabels } from "@/lib/admin-data";
 import type { AdminClient, ClientInput, ClientStatus, ServiceType } from "@/lib/admin-data";
-import { formatMoney } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 
 const emptyForm: ClientInput = {
   full_name: "",
@@ -166,7 +166,7 @@ export function ClientsManager({ initialClients, initialFeedback = "" }: { initi
             <MiniStat label="Clients" value={stats.total.toString()} />
             <MiniStat label="Actifs" value={stats.active.toString()} />
             <MiniStat label="Terminés" value={stats.completed.toString()} />
-            <MiniStat label="Revenus" value={formatMoney(stats.revenue)} />
+            <MiniStat label="Revenus" value={formatUsd(stats.revenue)} />
           </div>
         </div>
 
@@ -346,7 +346,7 @@ export function ClientsManager({ initialClients, initialFeedback = "" }: { initi
               <Detail label="Service" value={serviceLabels[selected.service as ServiceType] || selected.service} />
               <Detail label="Statut" value={statusLabels[selected.status] || selected.status} />
               <Detail label="Référence" value={selected.file_reference || "À créer"} />
-              <Detail label="Paiements" value={formatMoney(Number(selected.paid_amount || 0))} />
+              <Detail label="Paiements" value={formatUsd(Number(selected.paid_amount || 0))} />
               <div className="rounded-2xl bg-white/8 p-4">
                 <span className="block text-xs font-black uppercase tracking-[0.16em] text-white/42">Notes</span>
                 <p className="mt-2 text-sm leading-6 text-white/72">

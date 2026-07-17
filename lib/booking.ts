@@ -4,7 +4,7 @@ import QRCode from "qrcode";
 import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
 import { brand } from "@/lib/site";
 import { appointmentConfirmationEmailHtml } from "@/lib/appointment-confirmation-email";
-import { formatCountryName, formatDateFr, formatMoney, formatPhoneNumber, formatProperName } from "@/lib/format";
+import { formatCountryName, formatDateFr, formatPhoneNumber, formatProperName, formatUsd } from "@/lib/format";
 import { generatePremiumAppointmentInvoicePdf } from "@/lib/appointment-invoice";
 import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
 import { createClient } from "@/lib/admin-data";
@@ -281,6 +281,7 @@ export async function createAppointmentCheckout(input: AppointmentInput) {
   const params = new URLSearchParams();
   params.set("mode", "payment");
   params.set("locale", "fr");
+  params.set("adaptive_pricing[enabled]", "false");
   params.set("success_url", `${siteUrl}/rendez-vous?paiement=confirme&session_id={CHECKOUT_SESSION_ID}`);
   params.set("cancel_url", `${siteUrl}/rendez-vous?paiement=annule`);
   params.set("customer_email", normalized.email);
@@ -432,9 +433,8 @@ async function ensureAppointmentClient(appointment: Pick<Appointment, "client_fu
     { headers: headers(key), cache: "no-store" },
   );
   if (!lookup.ok) await supabaseError("Recherche du client du rendez-vous", lookup);
-  if (((await lookup.json()) as { id: string }[]).length) return;
-
-  await createClient({
+  const existingClient = ((await lookup.json()) as { id: string }[])[0];
+  const client = existingClient || await createClient({
     full_name: appointment.client_full_name,
     email: appointment.client_email,
     phone: appointment.client_phone,
@@ -445,7 +445,33 @@ async function ensureAppointmentClient(appointment: Pick<Appointment, "client_fu
     internal_notes: "Origine : réservation de consultation Stripe.",
     paid_amount: appointment.amount_cents / 100,
   });
+  await markClientPaymentStepCompleted(client.id);
   logBooking("crm_client_ready", "automatic", { email: appointment.client_email });
+}
+
+async function markClientPaymentStepCompleted(clientId: string) {
+  const { url, key } = config();
+  const progressUrl = `${url}/rest/v1/client_case_progress?client_id=eq.${encodeURIComponent(clientId)}&step_key=eq.payment`;
+  const currentResponse = await fetch(`${progressUrl}&select=status`, {
+    headers: headers(key),
+    cache: "no-store",
+  });
+  if (!currentResponse.ok) await supabaseError("Lecture de l’étape de paiement", currentResponse);
+  const current = ((await currentResponse.json()) as { status: string }[])[0];
+  if (current?.status === "completed") return;
+
+  const payload = {
+    client_id: clientId,
+    step_key: "payment",
+    status: "completed",
+    admin_note: "Paiement de consultation Stripe confirmé.",
+    updated_at: new Date().toISOString(),
+    updated_by: "stripe_webhook",
+  };
+  const response = current
+    ? await fetch(progressUrl, { method: "PATCH", headers: headers(key), body: JSON.stringify(payload) })
+    : await fetch(`${url}/rest/v1/client_case_progress`, { method: "POST", headers: headers(key), body: JSON.stringify(payload) });
+  if (!response.ok) await supabaseError("Mise à jour de l’étape de paiement", response);
 }
 
 async function updateAppointmentFulfillment(id: string, payload: Record<string, string | null>) {
@@ -491,7 +517,7 @@ function invoiceRows(appointment: Appointment) {
     ["Durée", `${appointment.duration_minutes} minutes`],
     ["Mode", consultationModeLabels[appointment.consultation_mode]],
     ["Date du rendez-vous", formatDateTimeFr(appointment.starts_at)],
-    ["Montant payé", `${formatMoney(appointment.amount_cents / 100)} USD`],
+    ["Montant payé", formatUsd(appointment.amount_cents / 100)],
     ["Devise", appointment.currency || "USD"],
     ["Méthode de paiement", appointment.payment_method_label || "Carte bancaire"],
     ["Transaction Stripe", appointment.stripe_payment_intent || appointment.stripe_session_id],
@@ -613,7 +639,7 @@ export async function sendAppointmentConfirmationEmail(appointment: Appointment)
     mode: consultationModeLabels[appointment.consultation_mode],
     bookingReference: appointment.booking_reference,
     invoiceNumber: appointment.invoice_number,
-    amount: `${formatMoney(appointment.amount_cents / 100)} $ US`,
+    amount: formatUsd(appointment.amount_cents / 100),
     invoiceUrl,
     portalUrl,
     contactUrl,
@@ -640,7 +666,7 @@ Type de consultation: ${consultationTypes[appointment.consultation_type].label}
 Date et heure: ${formatDateTimeFr(appointment.starts_at)}
 Durée: ${appointment.duration_minutes} minutes
 Mode: ${consultationModeLabels[appointment.consultation_mode]}
-Montant payé: ${formatMoney(appointment.amount_cents / 100)} USD
+Montant payé: ${formatUsd(appointment.amount_cents / 100)}
 Numéro de réservation: ${appointment.booking_reference}
 Facture: ${appointment.invoice_number}
 
@@ -713,12 +739,16 @@ ${brand.email}`,
   logBooking("reminder_accepted", appointment.stripe_session_id, { appointmentId: appointment.id });
 }
 
-export async function cancelAppointment(id: string) {
+export async function cancelAppointment(id: string, reason: string) {
   const { url, key, table } = config();
   const response = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { ...headers(key), Prefer: "return=representation" },
-    body: JSON.stringify({ status: "cancelled", cancelled_at: new Date().toISOString() }),
+    body: JSON.stringify({
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: reason.trim().slice(0, 500) || "Annulation administrative",
+    }),
   });
   if (!response.ok) await supabaseError("Annulation du rendez-vous", response);
   return ((await response.json()) as Appointment[])[0];
