@@ -1,6 +1,6 @@
 import "server-only";
 
-import { listClients, type AdminClient } from "@/lib/admin-data";
+import { createClient, listClients, type AdminClient, type ServiceType } from "@/lib/admin-data";
 import { createGeneratedDocument } from "@/lib/admin-documents";
 import { analyzeDossier, type AssistantContext } from "@/lib/ai-assistant";
 import { listAppointmentsForEmail } from "@/lib/booking";
@@ -8,11 +8,11 @@ import { listClientUploads } from "@/lib/client-portal";
 import { analyzeClientUpload } from "@/lib/document-analysis";
 import { documentFileName, type ClientDocumentType } from "@/lib/pdf-documents";
 import { createAuditLog } from "@/lib/platform-v2";
-import { listClientPayments } from "@/lib/production-workflow";
+import { listClientPayments, requestSignature } from "@/lib/production-workflow";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
-import { listClientTasks } from "@/lib/crm";
+import { addTimelineEvent, createTask, listClientTasks } from "@/lib/crm";
 
-export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "answer"; generatedDocumentId?: string };
+export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "create_client" | "create_task" | "request_signature" | "answer"; generatedDocumentId?: string };
 
 function normalize(value: string) { return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase("fr-CA"); }
 
@@ -60,8 +60,20 @@ const generatedTypes: Array<[RegExp, ClientDocumentType]> = [
 
 export async function executeJulieCommand(instruction: string, selectedClientId?: string): Promise<JulieExecution> {
   const clients = await listClients();
-  const targets = findTargets(instruction, clients, selectedClientId);
   const command = normalize(instruction);
+  if (/cree (le )?dossier|nouveau dossier|ajoute (le )?client/.test(command)) {
+    const email = instruction.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0];
+    const name = instruction.match(/(?:monsieur|madame|mme|m\.|client)\s+([\p{L}'’ -]{2,80})/iu)?.[1]?.split(/[,.;]|\s+(?:pour|email|courriel|visa|permis)\b/i)[0]?.trim();
+    const service: ServiceType = /etude/.test(command) ? "permis_etudes" : /travail/.test(command) ? "permis_travail" : /residence permanente/.test(command) ? "residence_permanente" : /visa|visiteur/.test(command) ? "visa_visiteur" : "autre";
+    const missing = [!name ? "le nom complet" : "", !email ? "l’adresse courriel" : "", service === "autre" ? "le type de dossier" : ""].filter(Boolean);
+    if (missing.length) return { answer: `Je peux créer ce dossier, mais il me manque ${missing.join(", ")}. Donnez-moi ces renseignements dans votre prochaine commande; je conserverai cet échange dans l’historique.`, clientIds: [], action: "create_client" };
+    if (clients.some((client) => normalize(client.full_name) === normalize(name!) || client.email.toLowerCase() === email!.toLowerCase())) return { answer: `Un dossier existe déjà pour ${name} ou ${email}. Je n’ai créé aucun doublon.`, clientIds: [], action: "create_client" };
+    const client = await createClient({ full_name: name!, email: email!, service, status: "nouveau", documents_received: [], documents_missing: [], action_history: [{ date: new Date().toISOString(), action: "Dossier créé par Julie depuis une commande en langage naturel." }], paid_amount: 0 });
+    await addTimelineEvent(client.id, "Dossier créé par Julie", instruction, "julie");
+    await createAuditLog({ actorId: "julie", actorType: "system", action: "create", entityType: "admin_clients", entityId: client.id, clientId: client.id, summary: `Dossier de ${client.full_name} créé par Julie.` });
+    return { answer: `J’ai créé le dossier de ${client.full_name} (${client.file_reference || "référence en cours"}) pour ${service.replaceAll("_", " ")}. Le dossier est maintenant disponible dans le CRM.`, clientIds: [client.id], action: "create_client" };
+  }
+  const targets = findTargets(instruction, clients, selectedClientId);
 
   if (/dossiers? (incomplets?|a completer)|pieces? manquantes?/.test(command)) {
     const checked = await Promise.all(clients.map(async (client) => ({ client, analysis: analyzeDossier(await contextFor(client)) })));
@@ -85,6 +97,43 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
     const document = await createGeneratedDocument({ client_id: client.id, client_name: client.full_name, document_type: documentType, file_name: documentFileName(client, documentType), included_information: { includeSignatures: true } });
     await createAuditLog({ actorId: "julie", actorType: "system", action: "generate", entityType: "admin_generated_documents", entityId: document.id, clientId: client.id, summary: `${document.document_label} généré par Julie pour ${client.full_name}.` });
     return { answer: `J’ai généré « ${document.document_label} » pour ${client.full_name}, rempli les données disponibles, sauvegardé le document et associé celui-ci au dossier client. Le PDF est disponible immédiatement dans les documents générés.`, clientIds: [client.id], action: "generate_document", generatedDocumentId: document.id };
+  }
+
+  if (/signature|a signer|fais signer/.test(command)) {
+    const client = targets[0];
+    if (!client) return { answer: "Sélectionnez ou nommez le client concerné par la signature.", clientIds: [], action: "request_signature" };
+    const type = documentType || "convention";
+    const signature = await requestSignature(client, type);
+    return { answer: `La demande de signature pour « ${signature.document_label} » est enregistrée pour ${client.full_name}. Le client peut la signer dans son espace sécurisé; une demande identique déjà en attente n’est jamais dupliquée.`, clientIds: [client.id], action: "request_signature" };
+  }
+
+  if (/ajoute.*tache|cree.*tache|rappelle.*de|il faut/.test(command)) {
+    const client = targets[0];
+    if (!client) return { answer: "Sélectionnez ou nommez le client auquel rattacher cette tâche.", clientIds: [], action: "create_task" };
+    const title = instruction.replace(/^(julie[,\s]*)?/i, "").replace(/^(ajoute|crée|cree)\s+(une\s+)?tâche\s*(pour\s+[^:,.]+)?[:\s-]*/i, "").trim().slice(0, 240);
+    if (title.length < 3) return { answer: "Indiquez l’action à ajouter dans la liste des tâches.", clientIds: [client.id], action: "create_task" };
+    const task = await createTask(client.id, { title, priority: /urgent|priorit/.test(command) ? "urgent" : "normal", assignedTo: "julie" });
+    await createAuditLog({ actorId: "julie", actorType: "system", action: "create", entityType: "client_tasks", entityId: task.id, clientId: client.id, summary: `Tâche créée par Julie : ${task.title}.` });
+    return { answer: `J’ai ajouté la tâche « ${task.title} » au dossier de ${client.full_name}, avec le statut « à faire »${task.priority === "urgent" ? " et la priorité urgente" : ""}.`, clientIds: [client.id], action: "create_task" };
+  }
+
+  if (/prepare tous|prochaines etapes|quoi faire/.test(command)) {
+    const client = targets[0];
+    if (!client) return { answer: "Sélectionnez ou nommez le client à préparer.", clientIds: [], action: "create_task" };
+    const context = await contextFor(client); const analysis = analyzeDossier(context); const existing = new Set(context.tasks.filter((task) => task.status !== "cancelled").map((task) => normalize(task.title)));
+    const proposed = [...analysis.missingDocuments.map((item) => `Obtenir : ${item}`), ...analysis.nextSteps.map((item) => `Étape suivante : ${item}`)].slice(0, 12);
+    const created = [];
+    for (const title of proposed) if (!existing.has(normalize(title))) created.push(await createTask(client.id, { title, priority: "normal", assignedTo: "julie" }));
+    await createAuditLog({ actorId: "julie", actorType: "system", action: "plan", entityType: "client_tasks", clientId: client.id, summary: `Plan de travail préparé par Julie (${created.length} nouvelle(s) tâche(s)).` });
+    return { answer: `J’ai analysé le dossier de ${client.full_name} et préparé le plan de travail. ${created.length} nouvelle(s) tâche(s) ont été ajoutées sans dupliquer les tâches existantes.\n${proposed.map((item) => `- ${item}`).join("\n")}`, clientIds: [client.id], action: "create_task" };
+  }
+
+  if (/recommand|priorit|renforcer|admissib/.test(command)) {
+    const client=targets[0];if(!client)return{answer:"Sélectionnez ou nommez le client à analyser.",clientIds:[],action:"answer"};
+    const context=await contextFor(client),analysis=analyzeDossier(context),urgent=context.tasks.filter(task=>task.priority==="urgent"&&task.status!=="completed");
+    const suggestions=[...analysis.missingDocuments.slice(0,5).map(item=>`Obtenir ou vérifier : ${item}`),...(analysis.inconsistencies[0]?.startsWith("Aucune")?[]:analysis.inconsistencies),...(analysis.missingDocuments.length>2?["Traiter ce dossier en priorité en raison du nombre de pièces à vérifier."]:[]),...(!context.documents.some(document=>normalize(document.category).includes("correspondance"))?["Évaluer avec le responsable autorisé si une lettre explicative factuelle serait utile."]:[])];
+    await createAuditLog({actorId:"julie",actorType:"system",action:"recommend",entityType:"admin_clients",entityId:client.id,clientId:client.id,summary:`Recommandations administratives préparées pour ${client.full_name}.`,metadata:{suggestionCount:suggestions.length,urgentTaskCount:urgent.length}});
+    return{answer:[`J’ai analysé les données enregistrées pour ${client.full_name}. Recommandations administratives :`,...suggestions.map(item=>`- ${item}`),"\nJe ne conclus pas à l’admissibilité juridique. Cette décision doit être validée par un professionnel autorisé après examen complet des faits et des règles applicables."].join("\n"),clientIds:[client.id],action:"answer"};
   }
 
   if (/analys|classe|renomm/.test(command) && /documents?/.test(command)) {

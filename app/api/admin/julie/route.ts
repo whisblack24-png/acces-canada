@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminIdentity, isAdminAuthenticated } from "@/lib/admin-auth";
 import { executeJulieCommand } from "@/lib/julie-agent";
-import { getJulieConversation, listJulieMessages, saveJulieMessage } from "@/lib/julie";
+import { getJulieConversation, listJulieMessages, saveJulieMessage, setJulieConversationClient } from "@/lib/julie";
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     const conversation = await getJulieConversation(identity.id);
     await saveJulieMessage(conversation.id, "staff", message);
     const execution = await executeJulieCommand(message, body.clientId);
+    await setJulieConversationClient(conversation.id, execution.clientIds[0]);
     await saveJulieMessage(conversation.id, "julie", execution.answer);
     return NextResponse.json({ ...execution, conversationId: conversation.id });
   } catch (error) {

@@ -21,7 +21,7 @@ export function replaceTemplateVariables(template: string, variables: Record<str
   const missing = new Set<string>();
   const content = template.replace(/\{\{\s*([\p{L}\p{N}_-]+)\s*\}\}/gu, (token, key: string) => {
     const value = variables[key];
-    if (value === undefined || value === null || value === "") { missing.add(key); return token; }
+    if (value === undefined || value === null || value === "") { missing.add(key); return `[À COMPLÉTER : ${key.replaceAll("_", " ")}]`; }
     return String(value);
   });
   return { content, missing: [...missing] };

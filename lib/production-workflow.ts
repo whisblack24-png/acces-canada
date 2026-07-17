@@ -3,6 +3,7 @@ import { documentLabels, type ClientDocumentType } from "@/lib/pdf-documents";
 import { sendSmtpMail, smtpSecurityForPort } from "@/lib/smtp";
 import { formatUsd } from "@/lib/format";
 import { assertStripeKeyForEnvironment } from "@/lib/stripe-webhook";
+import { createAuditLog } from "@/lib/platform-v2";
 
 export type SignatureStatus = "pending" | "signed" | "declined";
 export type PaymentStatus = "pending" | "paid" | "failed" | "cancelled";
@@ -154,6 +155,10 @@ export async function listClientSignatures(clientId: string) {
 
 export async function requestSignature(client: AdminClient, documentType: ClientDocumentType, documentId?: string | null) {
   const { url, key, signaturesTable } = config();
+  const existingResponse = await fetch(`${url}/rest/v1/${signaturesTable}?client_id=eq.${encodeURIComponent(client.id)}&document_type=eq.${encodeURIComponent(documentType)}&status=eq.pending&select=*&order=created_at.desc&limit=1`, { headers: headers(key), cache: "no-store" });
+  if (!existingResponse.ok) await supabaseError("Recherche signature en attente", existingResponse);
+  const existing = ((await existingResponse.json()) as ClientSignature[])[0];
+  if (existing && (!documentId || existing.document_id === documentId)) return existing;
   const response = await fetch(`${url}/rest/v1/${signaturesTable}`, {
     method: "POST",
     headers: { ...headers(key), Prefer: "return=representation" },
@@ -183,6 +188,8 @@ Document: ${signature.document_label}
 Accès Canada`,
   ).catch((error) => console.error("Notification signature non envoyée:", error));
 
+  await createAuditLog({ actorId: "julie", actorType: "system", action: "request_signature", entityType: signaturesTable, entityId: signature.id, clientId: client.id, summary: `Signature demandée pour ${signature.document_label}.`, metadata: { documentType, documentId: documentId || null } });
+
   return signature;
 }
 
@@ -191,7 +198,7 @@ export async function signDocument(signatureId: string, client: AdminClient, sig
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || null;
   const userAgent = request.headers.get("user-agent");
   const consentText = "Je confirme avoir lu, compris et accepté le document. Ma signature électronique a la même valeur qu'une signature manuscrite.";
-  const response = await fetch(`${url}/rest/v1/${signaturesTable}?id=eq.${encodeURIComponent(signatureId)}&client_id=eq.${encodeURIComponent(client.id)}`, {
+  const response = await fetch(`${url}/rest/v1/${signaturesTable}?id=eq.${encodeURIComponent(signatureId)}&client_id=eq.${encodeURIComponent(client.id)}&status=eq.pending`, {
     method: "PATCH",
     headers: { ...headers(key), Prefer: "return=representation" },
     body: JSON.stringify({
@@ -205,6 +212,7 @@ export async function signDocument(signatureId: string, client: AdminClient, sig
   });
   if (!response.ok) await supabaseError("Signature document", response);
   const signature = ((await response.json()) as ClientSignature[])[0];
+  if (!signature) throw new Error("Cette demande de signature est introuvable ou a déjà été traitée.");
 
   await updateClient(client.id, clientToInput(client, `Document signé électroniquement: ${signature.document_label}.`));
   await notifyClient(
@@ -219,6 +227,8 @@ Référence: ${client.file_reference || "à confirmer"}
 
 Accès Canada`,
   ).catch((error) => console.error("Notification signature confirmée non envoyée:", error));
+
+  await createAuditLog({ actorId: client.id, actorType: "client", action: "sign", entityType: signaturesTable, entityId: signature.id, clientId: client.id, summary: `${signature.document_label} signé électroniquement par ${client.full_name}.`, metadata: { signedAt: signature.signed_at, ipAddressRecorded: Boolean(ip), userAgentRecorded: Boolean(userAgent) } });
 
   return signature;
 }
