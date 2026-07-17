@@ -33,6 +33,14 @@ export type Appointment = {
   fulfillment_completed_at?: string | null;
   confirmation_email_sent_at?: string | null;
   fulfillment_error?: string | null;
+  stripe_fee_cents?: number | null;
+  net_amount_cents?: number | null;
+  stripe_settlement_currency?: string | null;
+  stripe_settlement_gross_cents?: number | null;
+  stripe_settlement_fee_cents?: number | null;
+  stripe_settlement_net_cents?: number | null;
+  stripe_exchange_rate?: number | null;
+  stripe_refunded_cents?: number | null;
 };
 
 export const consultationTypes: Record<

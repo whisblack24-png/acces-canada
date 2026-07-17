@@ -345,6 +345,7 @@ export async function confirmAppointmentFromStripeSession(session: {
   if (existing) {
     logBooking("appointment_existing", session.id, { appointmentId: existing.id });
     await ensureAppointmentClient(existing);
+    await syncStripeFinancialDetails(existing.id, existing.stripe_payment_intent);
     if (existing.fulfillment_status !== "completed") {
       await completeAppointmentFulfillment(existing);
       return (await getAppointment(existing.id)) || existing;
@@ -422,8 +423,55 @@ export async function confirmAppointmentFromStripeSession(session: {
   if (!insertResponse.ok) await supabaseError("Confirmation du rendez-vous", insertResponse);
   const appointment = ((await insertResponse.json()) as Appointment[])[0];
   logBooking("appointment_inserted", session.id, { appointmentId: appointment.id });
+  await syncStripeFinancialDetails(appointment.id, appointment.stripe_payment_intent);
   await completeAppointmentFulfillment(appointment);
   return (await getAppointment(appointment.id)) || appointment;
+}
+
+async function syncStripeFinancialDetails(appointmentId: string, paymentIntentId: string | null) {
+  if (!paymentIntentId) return;
+  const { stripeSecretKey, url, key, table } = config();
+  const response = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(paymentIntentId)}?expand[]=latest_charge.balance_transaction`, {
+    headers: { Authorization: `Bearer ${stripeSecretKey}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    console.warn("[appointment-booking] Détails financiers Stripe temporairement indisponibles", { appointmentId, status: response.status });
+    return;
+  }
+  const intent = await response.json() as {
+    latest_charge?: { amount_refunded?: number; balance_transaction?: { amount?: number; fee?: number; net?: number; currency?: string; exchange_rate?: number | null } };
+  };
+  const balance = intent.latest_charge?.balance_transaction;
+  if (!balance) return;
+  const patch = await fetch(`${url}/rest/v1/${table}?id=eq.${encodeURIComponent(appointmentId)}`, {
+    method: "PATCH",
+    headers: headers(key),
+    body: JSON.stringify({
+      stripe_fee_cents: balance.fee ?? null,
+      net_amount_cents: balance.net ?? null,
+      stripe_settlement_currency: balance.currency?.toUpperCase() || null,
+      stripe_settlement_gross_cents: balance.amount ?? null,
+      stripe_settlement_fee_cents: balance.fee ?? null,
+      stripe_settlement_net_cents: balance.net ?? null,
+      stripe_exchange_rate: balance.exchange_rate ?? null,
+      stripe_refunded_cents: intent.latest_charge?.amount_refunded || 0,
+    }),
+  });
+  if (!patch.ok) await supabaseError("Synchronisation financière Stripe", patch);
+}
+
+export async function syncAppointmentFinanceFromPaymentIntent(paymentIntentId: string) {
+  const { url, key, table } = config();
+  const lookup = await fetch(
+    `${url}/rest/v1/${table}?stripe_payment_intent=eq.${encodeURIComponent(paymentIntentId)}&select=id&limit=1`,
+    { headers: headers(key), cache: "no-store" },
+  );
+  if (!lookup.ok) await supabaseError("Recherche du rendez-vous remboursé", lookup);
+  const appointment = ((await lookup.json()) as { id: string }[])[0];
+  if (!appointment) return null;
+  await syncStripeFinancialDetails(appointment.id, paymentIntentId);
+  return appointment;
 }
 
 async function ensureAppointmentClient(appointment: Pick<Appointment, "client_full_name" | "client_email" | "client_phone" | "client_country" | "amount_cents">) {

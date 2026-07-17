@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { confirmAppointmentFromStripeSession } from "@/lib/booking";
+import { confirmAppointmentFromStripeSession, syncAppointmentFinanceFromPaymentIntent } from "@/lib/booking";
 import { markPaymentPaid } from "@/lib/production-workflow";
 import { stripeEventMatchesConfiguredMode, verifyStripeWebhookSignature } from "@/lib/stripe-webhook";
 
@@ -66,6 +66,13 @@ export async function POST(request: Request) {
         await markPaymentPaid(event.data.object.id, event.data.object.payment_intent || null);
         logWebhook("client_payment_complete", { eventId: event.id, sessionId });
       }
+    } else if (event.type === "charge.refunded" && event.data?.object?.payment_intent) {
+      const appointment = await syncAppointmentFinanceFromPaymentIntent(event.data.object.payment_intent);
+      logWebhook("refund_finance_synced", {
+        eventId: event.id,
+        paymentIntentId: event.data.object.payment_intent,
+        appointmentId: appointment?.id,
+      });
     } else {
       logWebhook("ignored", { eventId: event.id, eventType: event.type, sessionId });
     }

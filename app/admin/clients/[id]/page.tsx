@@ -23,6 +23,8 @@ import type { ServiceType } from "@/lib/admin-data";
 import { formatDateFr } from "@/lib/format";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
 import { listClientReminders, listClientTasks, listTimeline } from "@/lib/crm";
+import { analyzeDossier } from "@/lib/ai-assistant";
+import { ClientAiAssistant } from "@/components/admin/ClientAiAssistant";
 
 export const metadata: Metadata = {
   title: "Dossier client",
@@ -92,6 +94,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
         <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <div className="space-y-6">
+            <ClientAiAssistant clientId={client.id} analysis={analyzeDossier({client,documents:uploadedDocuments,questionnaires,progress:caseProgress,tasks})} />
             <Panel title="Informations personnelles" icon={<FileText className="h-5 w-5" />}>
               <Info label="Nom complet" value={client.full_name} />
               <Info label="Pays" value={client.country || "Non renseigné"} icon={<MapPin className="h-4 w-4" />} />

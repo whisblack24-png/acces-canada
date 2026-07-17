@@ -12,7 +12,7 @@ test("le courriel premium contient toutes les informations et actions attendues"
     mode: "Visioconférence",
     bookingReference: "AC-RDV-2026-0042",
     invoiceNumber: "AC-FAC-2026-0042",
-    amount: "100,00 $ US",
+    amount: "100 USD",
     invoiceUrl: "https://acces-canada.vercel.app/facture.pdf",
     portalUrl: "https://acces-canada.vercel.app/client/login",
     contactUrl: "https://acces-canada.vercel.app/contact",

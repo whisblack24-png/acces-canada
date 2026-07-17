@@ -1,0 +1,2 @@
+import { redirect } from "next/navigation";import { AdminShell } from "@/components/admin/AdminShell";import { LibraryManager } from "@/components/admin/LibraryManager";import { isAdminAuthenticated } from "@/lib/admin-auth";import { listLibraryItems } from "@/lib/document-library";
+export const dynamic="force-dynamic";export default async function LibraryPage(){if(!(await isAdminAuthenticated()))redirect("/admin/login");return <AdminShell><LibraryManager initialItems={await listLibraryItems()}/></AdminShell>}

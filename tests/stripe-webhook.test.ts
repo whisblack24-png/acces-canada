@@ -59,3 +59,14 @@ test("le paiement Stripe synchronise l’étape Paiement du dossier sans créer 
   assert.match(booking, /step_key: "payment"/);
   assert.match(booking, /status: "completed"/);
 });
+
+test("le webhook synchronise les frais et la conversion Stripe", () => {
+  const booking = readFileSync(new URL("../lib/booking.ts", import.meta.url), "utf8");
+  const webhook = readFileSync(new URL("../app/api/stripe/webhook/route.ts", import.meta.url), "utf8");
+  assert.match(booking, /expand\[\]=latest_charge\.balance_transaction/);
+  assert.match(booking, /stripe_settlement_net_cents/);
+  assert.match(booking, /stripe_exchange_rate/);
+  assert.match(booking, /stripe_refunded_cents/);
+  assert.match(webhook, /event\.type === "charge\.refunded"/);
+  assert.match(webhook, /syncAppointmentFinanceFromPaymentIntent/);
+});

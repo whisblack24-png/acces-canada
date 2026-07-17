@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart3, CalendarCheck, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, BookOpen, CalendarCheck, CircleDollarSign, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
 import { brand } from "@/lib/site";
 import { AdminCommandCenter } from "@/components/admin/AdminCommandCenter";
 
@@ -20,7 +20,9 @@ const adminNav: AdminNavItem[] = [
   { label: "Tâches et rappels", href: "/admin/suivi", icon: ListTodo },
   { label: "Journal d’activité", href: "/admin/activite", icon: Activity },
   { label: "Rendez-vous", href: "/admin/rendez-vous", icon: CalendarCheck },
+  { label: "Finances", href: "/admin/finances", icon: CircleDollarSign },
   { label: "Documents", href: "/admin/documents", icon: FileText },
+  { label: "Bibliothèque", href: "/admin/bibliotheque", icon: BookOpen },
   { label: "Rapports", href: "/admin/rapports", icon: BarChart3 },
 ];
 

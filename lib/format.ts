@@ -22,7 +22,16 @@ export function formatMoney(value: number | null | undefined) {
 }
 
 export function formatUsd(value: number | null | undefined) {
-  return `${formatMoney(value)} US`;
+  const amount = Number(value || 0);
+  return `${amount.toLocaleString("fr-CA", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })} USD`;
+}
+
+export function formatCad(value: number | null | undefined) {
+  const amount = Number(value || 0);
+  return `${amount.toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CAD`;
 }
 
 export function formatProperName(value: string) {
