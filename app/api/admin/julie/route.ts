@@ -20,9 +20,10 @@ export async function POST(request: Request) {
     const identity = await getAdminIdentity();
     if (!identity?.id) return NextResponse.json({ error: "Identité introuvable." }, { status: 401 });
     const conversation = await getJulieConversation(identity.id);
+    const history = await listJulieMessages(conversation.id);
     await saveJulieMessage(conversation.id, "staff", message);
-    const execution = await executeJulieCommand(message, body.clientId);
-    await setJulieConversationClient(conversation.id, execution.clientIds[0]);
+    const execution = await executeJulieCommand(message, body.clientId, history);
+    if (execution.action !== "create_client" || execution.clientIds.length) await setJulieConversationClient(conversation.id, execution.clientIds[0]);
     await saveJulieMessage(conversation.id, "julie", execution.answer);
     return NextResponse.json({ ...execution, conversationId: conversation.id });
   } catch (error) {

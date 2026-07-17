@@ -1,0 +1,61 @@
+import "server-only";
+
+export type JulieToolName =
+  | "create_client" | "summarize_client" | "list_incomplete_clients"
+  | "analyze_documents" | "generate_document" | "create_task"
+  | "request_signature" | "recommend" | "answer_from_records";
+
+export type JuliePlannedAction = {
+  tool: JulieToolName;
+  clientQuery?: string;
+  arguments?: Record<string, unknown>;
+};
+
+export type JuliePlan = {
+  scope: "new_client" | "existing_client" | "general";
+  ignoreActiveClient: boolean;
+  clarification?: string;
+  actions: JuliePlannedAction[];
+};
+
+const tools = ["create_client", "summarize_client", "list_incomplete_clients", "analyze_documents", "generate_document", "create_task", "request_signature", "recommend", "answer_from_records"];
+
+function credentials() {
+  const gateway = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+  if (gateway) return { url: "https://ai-gateway.vercel.sh/v1/chat/completions", token: gateway, model: process.env.JULIE_MODEL || "openai/gpt-5.4" };
+  if (process.env.OPENAI_API_KEY) return { url: "https://api.openai.com/v1/chat/completions", token: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL || "gpt-5.4" };
+  return null;
+}
+
+export async function planJulieInstruction(input: { instruction: string; activeClient?: { id: string; name: string } | null; history?: Array<{ role: string; content: string }> }): Promise<JuliePlan | null> {
+  const auth = credentials();
+  if (!auth) return null;
+  const schema = {
+    type: "object", additionalProperties: false,
+    properties: {
+      scope: { type: "string", enum: ["new_client", "existing_client", "general"] },
+      ignoreActiveClient: { type: "boolean" },
+      clarification: { type: "string" },
+      actions: { type: "array", maxItems: 8, items: { type: "object", additionalProperties: false, properties: {
+        tool: { type: "string", enum: tools }, clientQuery: { type: "string" }, arguments: { type: "object", additionalProperties: false, properties: {
+          full_name: { type: "string" }, email: { type: "string" }, phone: { type: "string" }, country: { type: "string" }, service: { type: "string" }, notes: { type: "string" }, title: { type: "string" }, document_type: { type: "string" }, question: { type: "string" },
+        }, required: ["full_name", "email", "phone", "country", "service", "notes", "title", "document_type", "question"] },
+      }, required: ["tool", "clientQuery", "arguments"] } },
+    }, required: ["scope", "ignoreActiveClient", "clarification", "actions"],
+  };
+  const history = (input.history || []).slice(-20).map((message) => `${message.role}: ${message.content}`).join("\n");
+  const system = `Tu es le planificateur d'actions de Julie, l'assistante administrative d'Accès Canada. Transforme la demande en zéro à huit appels d'outils ordonnés. Ne réponds jamais à partir de connaissances inventées : les réponses sur les dossiers doivent appeler un outil qui lit les données réelles. Une demande qui crée un nouveau client a scope=new_client, ignoreActiveClient=true et ne doit JAMAIS reprendre le client actif ni ses données. Extrais dans arguments de create_client les champs visibles parmi full_name,email,phone,country,service,notes; n'invente rien. Pour un client existant, mets son nom ou sa référence dans clientQuery. Si un renseignement indispensable manque, renseigne clarification et ne planifie pas l'écriture concernée. Les actions officielles ou externes nécessitant validation ne doivent pas être présentées comme déjà envoyées.`;
+  const response = await fetch(auth.url, { method: "POST", headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" }, body: JSON.stringify({
+    model: auth.model,
+    messages: [{ role: "system", content: system }, { role: "user", content: `Client actif (simple contexte, jamais une source pour un nouveau client): ${input.activeClient ? `${input.activeClient.name} [${input.activeClient.id}]` : "aucun"}\nHistorique:\n${history || "aucun"}\n\nDemande actuelle:\n${input.instruction}` }],
+    response_format: { type: "json_schema", json_schema: { name: "julie_plan", strict: true, schema } },
+  }) });
+  if (!response.ok) throw new Error(`Planification IA indisponible (${response.status}).`);
+  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const text = body.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Le modèle n'a produit aucun plan d'action.");
+  const plan = JSON.parse(text) as JuliePlan;
+  if (!Array.isArray(plan.actions) || plan.actions.some((action) => !tools.includes(action.tool))) throw new Error("Plan d'action invalide.");
+  if (plan.scope === "new_client") plan.ignoreActiveClient = true;
+  return plan;
+}

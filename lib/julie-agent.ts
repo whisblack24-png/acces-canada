@@ -11,8 +11,11 @@ import { createAuditLog } from "@/lib/platform-v2";
 import { listClientPayments, requestSignature } from "@/lib/production-workflow";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
 import { addTimelineEvent, createTask, listClientTasks } from "@/lib/crm";
+import { planJulieInstruction, type JuliePlannedAction } from "@/lib/julie-orchestrator";
+import type { JulieMessage } from "@/lib/julie";
 
-export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "create_client" | "create_task" | "request_signature" | "answer"; generatedDocumentId?: string };
+export type JulieActionResult = { tool: string; status: "completed" | "needs_input" | "failed"; label: string; clientId?: string };
+export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "create_client" | "create_task" | "request_signature" | "answer"; generatedDocumentId?: string; actions?: JulieActionResult[] };
 
 function normalize(value: string) { return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase("fr-CA"); }
 
@@ -58,7 +61,7 @@ const generatedTypes: Array<[RegExp, ClientDocumentType]> = [
   [/procuration/, "procuration"], [/lettre explicative/, "lettre-explicative"], [/autorisation/, "lettre-autorisation"],
 ];
 
-export async function executeJulieCommand(instruction: string, selectedClientId?: string): Promise<JulieExecution> {
+async function executeLegacyCommand(instruction: string, selectedClientId?: string): Promise<JulieExecution> {
   const clients = await listClients();
   const command = normalize(instruction);
   if (/cree (le )?dossier|nouveau dossier|ajoute (le )?client/.test(command)) {
@@ -147,4 +150,63 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
 
   if (targets.length) return { answer: `J’ai consulté le dossier réel.\n\n${await summarize(targets[0])}\n\nPrécisez l’action souhaitée : résumer, analyser les documents ou générer un document.`, clientIds: [targets[0].id], action: "answer" };
   return { answer: "Je peux consulter les dossiers réels. Nommez un client ou demandez : « Montre-moi les dossiers incomplets », « Résume le dossier d’Assiatou » ou « Génère une lettre d’invitation pour Elhadj ».", clientIds: [], action: "answer" };
+}
+
+function stringArg(action: JuliePlannedAction, key: string) { const value = action.arguments?.[key]; return typeof value === "string" ? value.trim() : ""; }
+
+async function createClientFromPlan(action: JuliePlannedAction): Promise<JulieExecution> {
+  const args = action.arguments || {};
+  const fullName = stringArg(action, "full_name");
+  const email = stringArg(action, "email").toLowerCase();
+  const phone = stringArg(action, "phone");
+  const country = stringArg(action, "country");
+  const serviceRaw = stringArg(action, "service");
+  const allowed = new Set<ServiceType>(["visa_visiteur", "permis_etudes", "permis_travail", "residence_permanente", "autre"]);
+  const service = allowed.has(serviceRaw as ServiceType) ? serviceRaw as ServiceType : "autre";
+  const missing = [!fullName && "le nom complet", !email && "l'adresse courriel", service === "autre" && "le type de dossier"].filter(Boolean);
+  if (missing.length) return { answer: `Il me manque ${missing.join(", ")} avant de créer ce dossier. Je n'ai réutilisé aucune donnée du client précédemment sélectionné.`, clientIds: [], action: "create_client", actions: [{ tool: action.tool, status: "needs_input", label: `Création suspendue : ${missing.join(", ")}` }] };
+  const clients = await listClients();
+  const duplicate = clients.find((client) => client.email.toLowerCase() === email || normalize(client.full_name) === normalize(fullName) || (phone && client.phone && client.phone.replace(/\D/g, "") === phone.replace(/\D/g, "")));
+  if (duplicate) return { answer: `J'ai trouvé un dossier possiblement identique : ${duplicate.full_name} (${duplicate.file_reference || duplicate.email}). Je n'ai créé aucun doublon. Confirmez si vous souhaitez utiliser ce dossier ou créer malgré tout un dossier distinct.`, clientIds: [duplicate.id], action: "create_client", actions: [{ tool: action.tool, status: "needs_input", label: "Doublon potentiel à confirmer", clientId: duplicate.id }] };
+  const client = await createClient({ full_name: fullName, email, phone: phone || undefined, country: country || undefined, service, status: "nouveau", notes: typeof args.notes === "string" ? args.notes.slice(0, 4000) : undefined, documents_received: [], documents_missing: [], action_history: [{ date: new Date().toISOString(), action: "Dossier créé par Julie depuis une commande structurée." }], paid_amount: 0 });
+  await Promise.all([
+    addTimelineEvent(client.id, "Dossier créé par Julie", "Données extraites et validées depuis la commande administrative.", "julie"),
+    createAuditLog({ actorId: "julie", actorType: "system", action: "create", entityType: "admin_clients", entityId: client.id, clientId: client.id, summary: `Dossier de ${client.full_name} créé par Julie.`, metadata: { source: "model_tool_plan" } }),
+  ]);
+  return { answer: `J'ai créé le dossier de ${client.full_name} (${client.file_reference || "référence en cours"}) et je l'ai associé au CRM.`, clientIds: [client.id], action: "create_client", actions: [{ tool: action.tool, status: "completed", label: `Dossier créé : ${client.full_name}`, clientId: client.id }] };
+}
+
+function commandFor(action: JuliePlannedAction) {
+  const client = action.clientQuery ? ` pour ${action.clientQuery}` : "";
+  switch (action.tool) {
+    case "summarize_client": return `Fais un résumé complet du dossier${client}`;
+    case "list_incomplete_clients": return "Montre-moi les dossiers incomplets et les pièces manquantes";
+    case "analyze_documents": return `Analyse, classe et renomme les documents${client}`;
+    case "generate_document": return `Génère ${stringArg(action, "document_type") || "une lettre explicative"}${client}`;
+    case "create_task": return `Crée une tâche${client}: ${stringArg(action, "title")}`;
+    case "request_signature": return `Fais signer ${stringArg(action, "document_type") || "la convention"}${client}`;
+    case "recommend": return `Analyse et recommande les prochaines étapes${client}`;
+    default: return `Consulte et réponds à propos du dossier${client}`;
+  }
+}
+
+export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = []): Promise<JulieExecution> {
+  const clients = await listClients();
+  const active = selectedClientId ? clients.find((client) => client.id === selectedClientId) : undefined;
+  let plan;
+  try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history }); }
+  catch (error) { console.error("Julie planification", error); plan = null; }
+  if (!plan) return executeLegacyCommand(instruction, selectedClientId);
+  if (plan.clarification && !plan.actions.length) return { answer: plan.clarification, clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification }] };
+  const executions: JulieExecution[] = [];
+  for (const planned of plan.actions) {
+    try {
+      const execution = planned.tool === "create_client" ? await createClientFromPlan(planned) : await executeLegacyCommand(commandFor(planned), plan.ignoreActiveClient ? undefined : selectedClientId);
+      executions.push({ ...execution, actions: execution.actions || [{ tool: planned.tool, status: "completed", label: execution.answer.split("\n")[0], clientId: execution.clientIds[0] }] });
+    } catch (error) {
+      executions.push({ answer: error instanceof Error ? error.message : "Action impossible.", clientIds: [], action: "answer", actions: [{ tool: planned.tool, status: "failed", label: error instanceof Error ? error.message : "Action impossible" }] });
+    }
+  }
+  if (!executions.length) return { answer: plan.clarification || "Je n'ai identifié aucune action sûre à exécuter. Précisez le client et le résultat attendu.", clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification || "Précision requise" }] };
+  return { answer: [plan.clarification, ...executions.map((item) => item.answer)].filter(Boolean).join("\n\n"), clientIds: [...new Set(executions.flatMap((item) => item.clientIds))], action: executions.at(-1)!.action, generatedDocumentId: executions.find((item) => item.generatedDocumentId)?.generatedDocumentId, actions: executions.flatMap((item) => item.actions || []) };
 }
