@@ -18,6 +18,8 @@ export type DocumentBrandMetadata = {
   createdAt?: string | null;
   digitallySigned?: boolean;
 };
+export type SignatureVector = { width:number; height:number; runs:ReadonlyArray<readonly [number,number,number]> };
+export type DocumentSignatureConfig = { director?:{enabled:boolean;vector?:SignatureVector|null}; counsel?:{enabled:boolean;vector?:SignatureVector|null} };
 
 export function pdfEscape(value: unknown) {
   return String(value ?? "").normalize("NFC").replace(/[^\x20-\x7E\u00A0-\u00FF]/g, " ").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -42,9 +44,9 @@ export function watermarkCommands(pageWidth=612,pageHeight=792){const cx=pageWid
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function officialSealCommands(x:number,y:number,size:number,_digitallySigned=false){const c=size/2;let out=pdfCircle(x+c,y+c,c-3,"1 1 1",true);out+=pdfCircle(x+c,y+c,c-3,PDF_GOLD,false,3);out+=pdfCircle(x+c,y+c,c-11,PDF_NAVY,false,3);out+=pdfCircle(x+c,y+c,c-23,PDF_GOLD,false,1.3);out+=pdfText("ACCÈS CANADA",x+size*.19,y+size*.76,size*.065,"F2",PDF_NAVY);out+=pdfText("AC",x+size*.31,y+size*.38,size*.22,"F2",PDF_NAVY);out+=pdfText("DOCUMENT OFFICIEL",x+size*.16,y+size*.15,size*.048,"F2",PDF_GOLD);out+=pdfText("*",x+size*.47,y+size*.60,size*.13,"F2",PDF_RED);return out;}
 
-function signaturePath(kind:"counsel",x:number,y:number,width:number){const scale=width/900,sy=scale*.58;const path="35 175 m 89 42 151 35 125 165 c 112 230 150 156 173 109 c 188 78 197 164 216 157 c 245 146 255 66 278 63 c 300 61 273 162 306 157 c 342 151 357 66 383 69 c 407 72 374 151 407 154 c 436 156 458 85 485 87 c 509 89 478 153 505 158 c 540 165 574 84 597 91 c 619 98 588 151 615 157 c 645 164 675 101 700 106 c 725 111 700 156 731 156 c 771 156 800 117 839 127 c";return `q ${PDF_NAVY} RG 6 w 1 J 1 j ${scale} 0 0 ${sy} ${x} ${y} cm ${path} S Q\n`;}
-function directorSignatureCommands(x:number,y:number,width:number){const scale=width/directorSignatureWidth,height=directorSignatureHeight*scale;return directorSignatureRuns.map(([rx,ry,rw])=>pdfRect(x+rx*scale,y+ry*scale,Math.max(rw*scale,.2),Math.max(height/directorSignatureHeight,.2),PDF_NAVY)).join("");}
-export function companySignatureCommands(kind:"director"|"counsel",x:number,y:number,width=190){const director=kind==="director";const mark=director?directorSignatureCommands(x,y+28,width):signaturePath("counsel",x,y+28,width);return mark+pdfText(director?"Christian Nkuli Mboyo":"Me Régine Sifa Buledi",x,y+20,9,"F2",PDF_NAVY)+pdfText(director?"Directeur général":"Conseillère juridique",x,y+7,7.5,"F1",PDF_MUTED)+pdfText("Accès Canada",x,y-5,7.5,"F1",PDF_MUTED);}
+function vectorSignatureCommands(vector:SignatureVector,x:number,y:number,width:number){const scale=width/vector.width;return vector.runs.map(([rx,ry,rw])=>pdfRect(x+rx*scale,y+(vector.height-ry-1)*scale,Math.max(rw*scale,.2),Math.max(scale,.2),PDF_NAVY)).join("");}
+const builtInDirector:SignatureVector={width:directorSignatureWidth,height:directorSignatureHeight,runs:directorSignatureRuns};
+export function companySignatureCommands(kind:"director"|"counsel",x:number,y:number,width=190,config?:DocumentSignatureConfig){const director=kind==="director",setting=director?config?.director:config?.counsel;const vector=setting?.vector||(director&&setting?.enabled!==false?builtInDirector:null);const mark=setting?.enabled!==false&&vector?vectorSignatureCommands(vector,x,y+28,width):pdfLine(x,y+45,x+width,y+45,"0.70 0.72 0.75",.8);return mark+pdfText(director?"Christian Nkuli Mboyo":"Me Régine Sifa Buledi",x,y+20,9,"F2",PDF_NAVY)+pdfText(director?"Directeur général":"Conseillère juridique",x,y+7,7.5,"F1",PDF_MUTED)+pdfText("Accès Canada",x,y-5,7.5,"F1",PDF_MUTED);}
 export function clientSignaturePlaceholder(x:number,y:number,width=190){return pdfLine(x,y+38,x+width,y+38,"0.70 0.72 0.75",.8)+pdfText("Signature du client",x,y+20,8,"F2",PDF_NAVY)+pdfText("Date : __________________",x,y+6,7.5,"F1",PDF_MUTED);}
 
 export function digitalSignatureCertificateCommands(meta:DocumentBrandMetadata,x:number,y:number,width=540){

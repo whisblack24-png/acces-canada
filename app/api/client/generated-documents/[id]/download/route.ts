@@ -3,6 +3,7 @@ import { getClientSession } from "@/lib/client-auth";
 import { getClient } from "@/lib/admin-data";
 import { getGeneratedDocument } from "@/lib/admin-documents";
 import { generateClientPdf } from "@/lib/pdf-documents";
+import { getDocumentSignatureConfig } from "@/lib/signature-settings";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,8 @@ export async function GET(_request: Request, context: Context) {
   const client = await getClient(session.clientId).catch(() => null);
   if (!client) return NextResponse.json({ message: "Client introuvable." }, { status: 404 });
 
-  const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, {}, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true });
+  const signatures=await getDocumentSignatureConfig();
+  const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, {}, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true }, signatures);
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",

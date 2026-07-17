@@ -33,6 +33,27 @@ test("les documents disposent des signatures, du cachet, du QR et du pied de pag
   assert.match(adminDownload, /digitallySigned: true/);
 });
 
+test("Régine ne reçoit jamais une fausse signature et son PNG reste administrable",()=>{
+  const branding=readFileSync("lib/document-branding.ts","utf8");
+  const settings=readFileSync("lib/signature-settings.ts","utf8");
+  const page=readFileSync("components/admin/SignatureSettingsPanel.tsx","utf8");
+  assert.doesNotMatch(branding,/signaturePath|125 165 c 112 230/);
+  assert.match(branding,/pdfLine\(x,y\+45/);
+  assert.match(settings,/Le PNG doit contenir un fond transparent/);
+  assert.match(page,/Aucune signature réelle importée/);
+  assert.match(page,/Désactiver temporairement/);
+  assert.match(page,/Importer le PNG/);
+});
+
+test("les paramètres de signatures sont privés et idempotents",()=>{
+  const migration=readFileSync("supabase/document_signature_settings.sql","utf8");
+  assert.match(migration,/create table if not exists public\.document_signature_settings/i);
+  assert.match(migration,/enable row level security/i);
+  assert.match(migration,/revoke all.*anon, authenticated/i);
+  assert.match(migration,/public,file_size_limit[\s\S]*false,3145728/);
+  assert.doesNotMatch(migration,/\b(delete from|truncate|drop table)\b/i);
+});
+
 test("la convention officielle couvre toutes les clauses contractuelles attendues", () => {
   const documents = readFileSync("lib/pdf-documents.ts", "utf8");
   assert.match(documents, /Convention de services Accès Canada/);

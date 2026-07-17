@@ -3,6 +3,7 @@ import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getClient } from "@/lib/admin-data";
 import { documentFileName, generateClientPdf, isClientDocumentType } from "@/lib/pdf-documents";
 import { getDecryptedQuestionnaires } from "@/lib/questionnaires";
+import { getDocumentSignatureConfig } from "@/lib/signature-settings";
 
 export const runtime = "nodejs";
 
@@ -26,9 +27,9 @@ export async function GET(_request: Request, context: Context) {
     return NextResponse.json({ message: "Client introuvable." }, { status: 404 });
   }
 
-  const questionnaires = await getDecryptedQuestionnaires(client.id);
+  const [questionnaires,signatures] = await Promise.all([getDecryptedQuestionnaires(client.id),getDocumentSignatureConfig()]);
   const data = Object.fromEntries(questionnaires.map(({ row, answers }) => [row.questionnaire_type === "client_principal" ? "client" : "guarantor", answers]));
-  const pdf = generateClientPdf(client, type, {}, data);
+  const pdf = generateClientPdf(client, type, {}, data, {}, signatures);
 
   return new Response(new Uint8Array(pdf), {
     headers: {

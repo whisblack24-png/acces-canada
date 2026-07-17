@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart3, BookOpen, CalendarCheck, CircleDollarSign, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, BookOpen, CalendarCheck, CircleDollarSign, FileSignature, FileText, LayoutDashboard, ListTodo, LogOut, UsersRound, type LucideIcon } from "lucide-react";
 import { brand } from "@/lib/site";
 import { AdminCommandCenter } from "@/components/admin/AdminCommandCenter";
 
@@ -23,6 +23,7 @@ const adminNav: AdminNavItem[] = [
   { label: "Finances", href: "/admin/finances", icon: CircleDollarSign },
   { label: "Documents", href: "/admin/documents", icon: FileText },
   { label: "Bibliothèque", href: "/admin/bibliotheque", icon: BookOpen },
+  { label: "Paramètres des signatures", href: "/admin/parametres-signatures", icon: FileSignature },
   { label: "Rapports", href: "/admin/rapports", icon: BarChart3 },
 ];
 

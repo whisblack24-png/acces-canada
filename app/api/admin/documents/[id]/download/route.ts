@@ -4,6 +4,7 @@ import { getClient } from "@/lib/admin-data";
 import { getGeneratedDocument } from "@/lib/admin-documents";
 import { generateClientPdf } from "@/lib/pdf-documents";
 import { getDecryptedQuestionnaires } from "@/lib/questionnaires";
+import { getDocumentSignatureConfig } from "@/lib/signature-settings";
 
 export const runtime = "nodejs";
 
@@ -27,9 +28,9 @@ export async function GET(_request: Request, context: Context) {
     return NextResponse.json({ message: "Client associe introuvable." }, { status: 404 });
   }
 
-  const questionnaires = await getDecryptedQuestionnaires(client.id);
+  const [questionnaires,signatures] = await Promise.all([getDecryptedQuestionnaires(client.id),getDocumentSignatureConfig()]);
   const data = Object.fromEntries(questionnaires.map(({ row, answers }) => [row.questionnaire_type === "client_principal" ? "client" : "guarantor", answers]));
-  const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, data, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true });
+  const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, data, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true }, signatures);
 
   return new Response(new Uint8Array(pdf), {
     headers: {

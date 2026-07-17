@@ -2,7 +2,7 @@
 import { serviceLabels, statusLabels } from "@/lib/admin-data";
 import { formatDateFr, formatUsd } from "@/lib/format";
 import type { QuestionnaireAnswers } from "@/lib/questionnaires";
-import { BrandedPdfBuilder, clientSignaturePlaceholder, companySignatureCommands, documentDate, officialSealCommands, pdfLine, pdfRect, pdfText, premiumFooterCommands, watermarkCommands, type DocumentBrandMetadata } from "@/lib/document-branding";
+import { BrandedPdfBuilder, clientSignaturePlaceholder, companySignatureCommands, documentDate, officialSealCommands, pdfLine, pdfRect, pdfText, premiumFooterCommands, watermarkCommands, type DocumentBrandMetadata, type DocumentSignatureConfig } from "@/lib/document-branding";
 import { digitalSignatureCertificateCommands } from "@/lib/document-branding";
 
 export type QuestionnaireDocumentData = { client?: QuestionnaireAnswers; guarantor?: QuestionnaireAnswers };
@@ -331,7 +331,7 @@ function linesFor(client: AdminClient, type: ClientDocumentType, options: Docume
   ];
 }
 
-export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}, questionnaireData: QuestionnaireDocumentData = {}, metadata: Partial<DocumentBrandMetadata> = {}) {
+export function generateClientPdf(client: AdminClient, type: ClientDocumentType, options: DocumentGenerationOptions = {}, questionnaireData: QuestionnaireDocumentData = {}, metadata: Partial<DocumentBrandMetadata> = {}, signatures?:DocumentSignatureConfig) {
   const title = documentLabels[type];
   const rows = linesFor(client, type, options, questionnaireData);
   const meta:DocumentBrandMetadata={documentNumber:metadata.documentNumber||`AC-DOC-${client.id.slice(0,8).toUpperCase()}`,verificationToken:metadata.verificationToken||null,authenticityHash:metadata.authenticityHash||null,version:metadata.version||1,status:metadata.status||"active",createdAt:metadata.createdAt||new Date().toISOString(),digitallySigned:metadata.digitallySigned!==false};
@@ -349,9 +349,9 @@ export function generateClientPdf(client: AdminClient, type: ClientDocumentType,
   ensure(220);
   content.push(pdfText("VALIDATION ET SIGNATURES",36,y,10,"F2","0.816 0 0"));
   y-=105;
-  content.push(companySignatureCommands("director",36,y,170));
+  content.push(companySignatureCommands("director",36,y,170,signatures));
   const needsCounsel=["convention","lettre-explicative","lettre-soutien-financier","lettre-invitation"].includes(type);
-  if(needsCounsel)content.push(companySignatureCommands("counsel",220,y,170));
+  if(needsCounsel)content.push(companySignatureCommands("counsel",220,y,170,signatures));
   content.push(clientSignaturePlaceholder(410,y,150));
   content.push(digitalSignatureCertificateCommands(meta,36,y-76,360));
   pages.push(content);const builder=new BrandedPdfBuilder();pages.forEach((commands,index)=>builder.addPage(commands.join("")+officialSealCommands(430,76,92,meta.digitallySigned)+premiumFooterCommands(meta,index+1,pages.length)));return builder.finish();

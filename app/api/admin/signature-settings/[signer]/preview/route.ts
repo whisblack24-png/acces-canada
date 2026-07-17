@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { readSignaturePng,type SignerKey } from "@/lib/signature-settings";
+export async function GET(_:Request,{params}:{params:Promise<{signer:string}>}){if(!(await isAdminAuthenticated()))return NextResponse.json({error:"Non autorisé."},{status:401});const{signer}=await params;if(signer!=="director"&&signer!=="legal_counsel")return NextResponse.json({error:"Introuvable."},{status:404});const png=await readSignaturePng(signer as SignerKey);if(!png&&signer==="director")return NextResponse.redirect(new URL("/brand/signature-director.png",process.env.NEXT_PUBLIC_SITE_URL||"http://localhost:3000"));if(!png)return NextResponse.json({error:"Aucune signature importée."},{status:404});return new NextResponse(new Uint8Array(png),{headers:{"Content-Type":"image/png","Cache-Control":"private, no-store"}});}
