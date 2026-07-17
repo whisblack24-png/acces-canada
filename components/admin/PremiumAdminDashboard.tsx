@@ -11,7 +11,7 @@ import { buildCrmStats, type ClientReminder, type ClientTask } from "@/lib/crm";
 type DashboardData = ReturnType<typeof buildAdminDashboard>;
 type ChartMetric = "revenue" | "appointments" | "clients";
 
-export function PremiumAdminDashboard({ data, tasks, reminders }: { data: DashboardData; tasks: ClientTask[]; reminders: ClientReminder[] }) {
+export function PremiumAdminDashboard({ data, tasks, reminders,briefing }: { data: DashboardData; tasks: ClientTask[]; reminders: ClientReminder[]; briefing:{since:string;greeting:string;intro:string;items:string[]}|null }) {
   const [query, setQuery] = useState("");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("revenue");
   const router = useRouter();
@@ -37,7 +37,7 @@ export function PremiumAdminDashboard({ data, tasks, reminders }: { data: Dashbo
       </div>
     </section>
 
-    <section className="rounded-[2rem] border border-gold/30 bg-white p-6 shadow-premium md:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[.2em] text-canada">Julie Mboyo · Assistante administrative</p><h2 className="mt-2 font-display text-3xl font-black">Bonjour Christian.</h2><p className="mt-2 text-navy/55">Aujourd’hui : {data.metrics.newClients} nouveau(x) client(s), {data.metrics.upcomingAppointments} rendez-vous à venir, {data.metrics.paymentsReceived} paiement(s) reçu(s) et {data.metrics.pendingDocuments} document(s) à valider.</p></div><Link href="/admin/julie" className="shrink-0 rounded-xl bg-gold px-5 py-3 text-center font-black text-navy">Discuter avec Julie</Link></div></section>
+    <section className="rounded-[2rem] border border-gold/30 bg-white p-6 shadow-premium md:p-8"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-black uppercase tracking-[.2em] text-canada">Julie Mboyo · Assistante administrative</p><h2 className="mt-2 font-display text-3xl font-black">{briefing?.greeting||"Bonjour Christian."}</h2><p className="mt-2 text-sm text-navy/45">Depuis {briefing?new Date(briefing.since).toLocaleString("fr-CA"):"votre dernière connexion"}</p><ul className="mt-4 grid gap-2 text-sm font-bold text-navy/65 sm:grid-cols-2">{(briefing?.items||[]).map(item=><li key={item}>• {item}</li>)}</ul></div><Link href="/admin/julie" className="shrink-0 rounded-xl bg-gold px-5 py-3 text-center font-black text-navy">Discuter avec Julie</Link></div></section>
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">{metrics.map(([label, value, Icon], index) => <article key={label} className={`group rounded-[1.5rem] p-5 shadow-premium transition duration-300 hover:-translate-y-1 ${index < 4 ? "bg-navy text-white" : "bg-white text-navy"}`}><span className={`grid h-10 w-10 place-items-center rounded-xl ${index < 4 ? "bg-gold text-navy" : "bg-gold/18"}`}><Icon className="h-5 w-5" /></span><p className={`mt-5 text-[10px] font-black uppercase tracking-[.15em] ${index < 4 ? "text-white/45" : "text-navy/40"}`}>{label}</p><p className="mt-2 text-3xl font-black">{value}</p></article>)}</section>
 

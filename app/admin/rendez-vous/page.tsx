@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { AppointmentsManager } from "@/components/admin/AppointmentsManager";
@@ -25,6 +26,7 @@ export default async function AdminAppointmentsPage() {
           <p className="mt-4 max-w-3xl leading-8 text-white/66">
             Consultez les consultations payées, les numéros de réservation, les factures et les actions de suivi.
           </p>
+          <Link href="/admin/rendez-vous/automatisations" className="mt-5 inline-flex rounded-full bg-gold px-5 py-3 text-sm font-black text-navy">Configurer les acomptes et rappels</Link>
         </section>
 
         <AppointmentsManager initialAppointments={appointments} />

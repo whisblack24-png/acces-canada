@@ -25,6 +25,7 @@ import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
 import { listClientReminders, listClientTasks, listTimeline } from "@/lib/crm";
 import { analyzeDossier } from "@/lib/ai-assistant";
 import { ClientAiAssistant } from "@/components/admin/ClientAiAssistant";
+import { listDocumentAnalyses } from "@/lib/document-analysis";
 
 export const metadata: Metadata = {
   title: "Dossier client",
@@ -52,7 +53,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
 
   const received = client.documents_received || [];
   const missing = client.documents_missing || [];
-  const [uploadedDocuments, generatedDocuments, appointments, payments, messages, questionnaires, caseProgress, timeline, tasks, reminders] = await Promise.all([
+  const [uploadedDocuments, generatedDocuments, appointments, payments, messages, questionnaires, caseProgress, timeline, tasks, reminders,documentAnalyses] = await Promise.all([
     listClientUploads(client.id, true).catch(() => []),
     listGeneratedDocumentsForClient(client.id).catch(() => []),
     listAppointmentsForEmail(client.email).catch(() => []),
@@ -60,7 +61,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
     listClientMessages(client.id).catch(() => []),
     listQuestionnaires(client.id).catch(() => []),
     listCaseProgress(client.id).catch(() => []),
-    listTimeline(client.id).catch(() => []), listClientTasks(client.id).catch(() => []), listClientReminders(client.id).catch(() => []),
+    listTimeline(client.id).catch(() => []), listClientTasks(client.id).catch(() => []), listClientReminders(client.id).catch(() => []),listDocumentAnalyses(client.id).catch(()=>[]),
   ]);
   const history = client.action_history?.length
     ? client.action_history
@@ -178,7 +179,7 @@ export default async function ClientDossierPage({ params }: PageProps) {
             </Panel>
 
             <Panel title="Gestionnaire de documents" icon={<FileCheck2 className="h-5 w-5" />}>
-              <ClientUploadedDocumentsAdmin clientId={client.id} documents={uploadedDocuments} />
+              <ClientUploadedDocumentsAdmin clientId={client.id} documents={uploadedDocuments} analyses={documentAnalyses} />
             </Panel>
 
             <Panel title="Documents générés par Accès Canada" icon={<FileText className="h-5 w-5" />}>

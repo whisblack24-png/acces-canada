@@ -2,6 +2,7 @@
 import { getClientSession } from "@/lib/client-auth";
 import { createClientUpload, listClientUploads, markClientUploadReceived, replaceClientFile, uploadClientFile } from "@/lib/client-portal";
 import { DOCUMENT_CATEGORY_VALUES, DOCUMENT_MAX_SIZE, DOCUMENT_MIME_TYPES } from "@/lib/document-categories";
+import { analyzeClientUpload } from "@/lib/document-analysis";
 
 export const runtime = "nodejs";
 
@@ -51,7 +52,8 @@ export async function POST(request: Request) {
         })();
     await markClientUploadReceived(session.clientId, file.name);
 
-    return NextResponse.json({ upload }, { status: 201 });
+    const analysis=await analyzeClientUpload(upload).catch(error=>{console.error("Analyse documentaire Julie:",error);return null;});
+    return NextResponse.json({ upload,analysis }, { status: 201 });
   } catch (error) {
     console.error("Erreur upload client:", error);
     return NextResponse.json({ message: "Impossible d'envoyer le document." }, { status: 500 });

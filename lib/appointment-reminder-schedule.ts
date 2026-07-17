@@ -1,0 +1,2 @@
+export type SchedulableAppointment={id:string;starts_at:string};
+export function remindersDue<T extends SchedulableAppointment>(appointments:T[],offsets:number[],now=Date.now()){return appointments.flatMap(appointment=>offsets.map(offsetHours=>({appointment,offsetHours,difference:Math.abs(new Date(appointment.starts_at).getTime()-now-offsetHours*3600000)}))).filter(item=>item.difference<=35*60000);}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { DOCUMENT_CATEGORY_VALUES, DOCUMENT_MAX_SIZE, DOCUMENT_MIME_TYPES } from "@/lib/document-categories";
 import { createClientUpload, replaceClientFile, uploadClientFile } from "@/lib/client-portal";
+import { analyzeClientUpload } from "@/lib/document-analysis";
 
 export const runtime = "nodejs";
 const allowedTypes = new Set<string>(DOCUMENT_MIME_TYPES);
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
             file_size: file.size, category, version: 1, status: "active", replaced_document_id: null, uploaded_by: uploadedBy,
           });
         })();
-    return NextResponse.json({ upload }, { status: 201 });
+    const analysis=await analyzeClientUpload(upload).catch(error=>{console.error("Analyse documentaire Julie:",error);return null;});
+    return NextResponse.json({ upload,analysis }, { status: 201 });
   } catch (error) {
     console.error("Erreur téléversement document administrateur:", error);
     return NextResponse.json({ message: "Impossible d’enregistrer le document." }, { status: 500 });

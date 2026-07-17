@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { listAppointments, sendAppointmentReminderEmail } from "@/lib/booking";
-import { isCronAuthorized, runAppointmentReminders } from "@/lib/appointment-reminders";
+import { isCronAuthorized } from "@/lib/appointment-reminders";
+import { finishReminderDelivery,getAppointmentAutomationSettings,reserveReminderDelivery } from "@/lib/appointment-automation";
+import { remindersDue } from "@/lib/appointment-reminder-schedule";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -17,10 +19,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await runAppointmentReminders({
-      listConfirmedAppointments: () => listAppointments({ status: "confirmed" }),
-      sendReminder: sendAppointmentReminderEmail,
-    });
+    const settings=await getAppointmentAutomationSettings();
+    const appointments=await listAppointments({status:"confirmed"});
+    const due=remindersDue(appointments,settings.email_enabled?settings.reminder_offsets_hours:[]);
+    let sent=0,failed=0;
+    for(const item of due){if(!(await reserveReminderDelivery(item.appointment.id,item.offsetHours)))continue;try{await sendAppointmentReminderEmail(item.appointment);await finishReminderDelivery(item.appointment.id,item.offsetHours);sent++;}catch(error){await finishReminderDelivery(item.appointment.id,item.offsetHours,error);failed++;}}
+    const result={candidates:due.length,sent,failed};
     console.info("[appointment-reminders] completed", {
       ...result,
       durationMs: Date.now() - startedAt,
