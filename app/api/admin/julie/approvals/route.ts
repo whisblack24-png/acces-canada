@@ -1,0 +1,5 @@
+import { NextResponse } from "next/server";
+import { getAdminIdentity,isAdminAuthenticated } from "@/lib/admin-auth";
+import { listJulieApprovals,reviewJulieApproval } from "@/lib/julie";
+export async function GET(){if(!(await isAdminAuthenticated()))return NextResponse.json({error:"Non autorisé."},{status:401});return NextResponse.json(await listJulieApprovals());}
+export async function PATCH(request:Request){if(!(await isAdminAuthenticated()))return NextResponse.json({error:"Non autorisé."},{status:401});const body=await request.json() as{id?:string;status?:"approved"|"rejected";note?:string};if(!body.id||!body.status)return NextResponse.json({error:"Décision incomplète."},{status:400});try{const identity=await getAdminIdentity();if(!identity?.id)return NextResponse.json({error:"Identité administrative introuvable."},{status:401});return NextResponse.json(await reviewJulieApproval(body.id,body.status,identity.id,String(body.note||"").slice(0,2000)));}catch(error){return NextResponse.json({error:error instanceof Error?error.message:"Décision impossible."},{status:400});}}

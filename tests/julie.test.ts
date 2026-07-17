@@ -1,0 +1,6 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+test("Julie est une assistante administrative soumise à approbation",()=>{const source=readFileSync("lib/julie.ts","utf8");assert.match(source,/Julie Mboyo/);assert.match(source,/Assistante administrative/);for(const action of ["convention","procuration","soumission_ircc","remboursement","suppression_definitive"])assert.match(source,new RegExp(action));assert.match(source,/validation du directeur est obligatoire/);assert.doesNotMatch(source,/Tu es une intelligence artificielle/i)});
+test("les données de Julie sont privées et les suppressions de clients préservent l’historique",()=>{const sql=readFileSync("supabase/julie_assistant_foundations.sql","utf8");assert.match(sql,/enable row level security/);assert.match(sql,/revoke all.*anon,authenticated/);assert.match(sql,/client_id uuid references public\.admin_clients\(id\) on delete set null/);assert.doesNotMatch(sql,/\b(delete from|truncate|drop table)\b/i)});
+test("Julie n’est jamais une signataire officielle",()=>{const pdf=readFileSync("lib/pdf-documents.ts","utf8"),branding=readFileSync("lib/document-branding.ts","utf8");assert.match(pdf,/Préparé par : Julie Mboyo - Assistante administrative/);assert.doesNotMatch(branding,/Julie Mboyo/);});

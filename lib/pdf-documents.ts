@@ -32,6 +32,7 @@ export type DocumentGenerationOptions = {
   includePayments?: boolean;
   includeSignatures?: boolean;
   caseType?: ImmigrationCaseType;
+  preparedByJulie?: boolean;
 };
 
 export const documentLabels: Record<ClientDocumentType, string> = {
@@ -347,6 +348,7 @@ export function generateClientPdf(client: AdminClient, type: ClientDocumentType,
     const wrapped=safe(value).match(/.{1,66}(\s|$)|.{1,66}/g)||[safe(value)],height=Math.max(28,wrapped.length*13+14);ensure(height);content.push(pdfRect(36,y-height+8,540,height,"1 1 1"),pdfText(label,48,y-7,8,"F2","0.051 0.106 0.165"));wrapped.forEach((line,index)=>content.push(pdfText(line.trim(),176,y-7-index*12,9,"F1","0.105 0.133 0.170")));y-=height+5;
   });
   ensure(220);
+  if(options.preparedByJulie)content.push(pdfText("Préparé par : Julie Mboyo - Assistante administrative",36,y+18,7.5,"F1","0.390 0.425 0.470"));
   content.push(pdfText("VALIDATION ET SIGNATURES",36,y,10,"F2","0.816 0 0"));
   y-=105;
   content.push(companySignatureCommands("director",36,y,170,signatures));
