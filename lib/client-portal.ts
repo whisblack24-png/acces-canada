@@ -311,6 +311,19 @@ export async function renameClientUpload(clientId:string,uploadId:string,fileNam
   const row=((await response.json()) as ClientUploadedDocument[])[0];if(!row)throw new Error("Document introuvable.");return row;
 }
 
+export async function updateClientUploadMetadata(clientId:string,uploadId:string,input:{fileName?:string;category?:string}){
+  const {url,key,uploadsTable}=config();
+  const payload:Record<string,string>={};
+  if(input.fileName?.trim())payload.file_name=input.fileName.trim().slice(0,240);
+  if(input.category?.trim())payload.category=input.category.trim().slice(0,120);
+  if(!Object.keys(payload).length)throw new Error("Aucune modification de document demandée.");
+  const response=await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}&status=eq.active`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify(payload)});
+  if(!response.ok)throw new Error(`Mise à jour du document impossible (${response.status}) : ${await response.text()}`);
+  const updated=((await response.json()) as ClientUploadedDocument[])[0];
+  if(!updated)throw new Error("Document introuvable dans ce dossier client.");
+  return updated;
+}
+
 export async function deleteClientStorageFiles(filePaths: string[]) {
   const { url, key, bucket } = config();
   const failures: string[] = [];

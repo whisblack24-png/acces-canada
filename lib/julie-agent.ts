@@ -1,16 +1,17 @@
 import "server-only";
 
-import { createClient, listClients, updateClient, type AdminClient, type ClientInput, type ServiceType } from "@/lib/admin-data";
+import { createClient, deleteClient, listClients, updateClient, type AdminClient, type ClientInput, type ServiceType } from "@/lib/admin-data";
 import { createGeneratedDocument } from "@/lib/admin-documents";
 import { analyzeDossier, type AssistantContext } from "@/lib/ai-assistant";
-import { listAppointments, listAppointmentsForEmail } from "@/lib/booking";
-import { listClientUploads } from "@/lib/client-portal";
+import { cancelAppointment, listAppointments, listAppointmentsForEmail, moveAppointment } from "@/lib/booking";
+import { deleteClientFile, listClientUploads, updateClientUploadMetadata, type ClientUploadedDocument } from "@/lib/client-portal";
 import { analyzeClientUpload } from "@/lib/document-analysis";
 import { documentFileName, type ClientDocumentType } from "@/lib/pdf-documents";
-import { createAuditLog } from "@/lib/platform-v2";
+import { createAuditLog, universalSearch } from "@/lib/platform-v2";
 import { listClientPayments } from "@/lib/production-workflow";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
-import { addTimelineEvent, createReminder, createTask, listClientTasks } from "@/lib/crm";
+import { addTimelineEvent, createReminder, createTask, listClientTasks, updateTask } from "@/lib/crm";
+import { buildAdminReport } from "@/lib/admin-reports";
 import { planJulieInstruction, type JuliePlannedAction } from "@/lib/julie-orchestrator";
 import { createJulieApproval, listJulieApprovals, type JulieMessage } from "@/lib/julie";
 
@@ -206,6 +207,84 @@ async function executeLegacyCommand(instruction: string, selectedClientId?: stri
 
 function stringArg(action: JuliePlannedAction, key: string) { const value = action.arguments?.[key]; return typeof value === "string" ? value.trim() : ""; }
 
+async function resolvePlannedClient(action: JuliePlannedAction, selectedClientId?: string) {
+  const clients = await listClients();
+  if (selectedClientId) {
+    const selected = clients.find((client) => client.id === selectedClientId);
+    if (selected) return selected;
+  }
+  const query = normalize(action.clientQuery || stringArg(action, "full_name"));
+  if (!query) return null;
+  return clients.find((client) => normalize(client.full_name).includes(query) || query.includes(normalize(client.full_name)) || normalize(client.file_reference || "") === query || client.email.toLowerCase() === query) || null;
+}
+
+async function resolveUpload(action: JuliePlannedAction, client: AdminClient) {
+  const uploads = (await listClientUploads(client.id)).filter((item) => item.status === "active");
+  const id = stringArg(action, "document_id");
+  const name = normalize(stringArg(action, "document_name") || stringArg(action, "query"));
+  const matches = uploads.filter((item) => id ? item.id === id : name && normalize(item.file_name).includes(name));
+  if (!matches.length) throw new Error("Je n’ai trouvé aucun document correspondant dans ce dossier.");
+  if (matches.length > 1) throw new Error(`J’ai trouvé ${matches.length} documents correspondants. Précisez le nom exact avant de continuer.`);
+  return matches[0] as ClientUploadedDocument;
+}
+
+async function executePlannedAction(action: JuliePlannedAction, selectedClientId?: string): Promise<JulieExecution> {
+  if (action.tool === "create_client") return createClientFromPlan(action);
+  if (action.tool === "search_records") {
+    const query = stringArg(action, "query") || action.clientQuery || stringArg(action, "question");
+    if (query.length < 2) return { answer: "Quel client, document, paiement ou rendez-vous dois-je rechercher ?", clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Terme de recherche requis" }] };
+    const results = await universalSearch(query);
+    return { answer: results.length ? [`J’ai trouvé ${results.length} résultat(s) pour « ${query} » :`, ...results.slice(0, 20).map((item) => `- ${item.type} — ${item.title}${item.subtitle ? ` (${item.subtitle})` : ""}`)].join("\n") : `Aucun résultat trouvé pour « ${query} ».`, clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "completed", label: `${results.length} résultat(s) trouvé(s)` }] };
+  }
+  if (action.tool === "generate_report") {
+    const report = await buildAdminReport(await listClients());
+    const totals = report.totals;
+    return { answer: [`Rapport administratif généré à partir des données réelles :`, `- ${totals.clients} client(s), dont ${totals.activeCases} dossier(s) actif(s)`, `- ${totals.uploadedDocuments} document(s) importé(s) et ${totals.generatedDocuments} document(s) généré(s)`, `- ${totals.documentsMissing} pièce(s) signalée(s) manquante(s)`, `- Revenu enregistré : ${totals.revenue.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}`].join("\n"), clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "completed", label: "Rapport CRM calculé" }] };
+  }
+  const client = await resolvePlannedClient(action, selectedClientId);
+  if (["delete_client", "rename_document", "move_document", "delete_document", "update_task"].includes(action.tool) && !client) return { answer: "Sélectionnez ou nommez précisément le dossier client concerné.", clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Client requis" }] };
+  if (action.tool === "delete_client") {
+    const deleted = await deleteClient(client!.id, "julie");
+    await createAuditLog({ actorId: "julie", actorType: "system", action: "delete", entityType: "admin_clients", entityId: client!.id, clientId: client!.id, summary: `Dossier de ${client!.full_name} supprimé après approbation.` });
+    return { answer: `Le dossier de ${deleted.full_name} a été supprimé et l’opération a été journalisée.`, clientIds: [], action: "answer" };
+  }
+  if (["rename_document", "move_document", "delete_document"].includes(action.tool)) {
+    const upload = await resolveUpload(action, client!);
+    if (action.tool === "delete_document") {
+      await deleteClientFile(client!.id, upload.id);
+      await createAuditLog({ actorId: "julie", actorType: "system", action: "delete", entityType: "client_uploaded_documents", entityId: upload.id, clientId: client!.id, summary: `Document « ${upload.file_name} » supprimé après approbation.` });
+      return { answer: `Le document « ${upload.file_name} » a été supprimé du dossier de ${client!.full_name}.`, clientIds: [client!.id], action: "answer" };
+    }
+    const newName = stringArg(action, "new_name");
+    const category = stringArg(action, "category");
+    if (action.tool === "rename_document" && !newName) return { answer: "Quel nouveau nom dois-je donner à ce document ?", clientIds: [client!.id], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Nouveau nom requis", clientId: client!.id }] };
+    if (action.tool === "move_document" && !category) return { answer: "Dans quelle catégorie dois-je déplacer ce document ?", clientIds: [client!.id], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Catégorie requise", clientId: client!.id }] };
+    const updated = await updateClientUploadMetadata(client!.id, upload.id, { fileName: newName || undefined, category: category || undefined });
+    await createAuditLog({ actorId: "julie", actorType: "system", action: "update", entityType: "client_uploaded_documents", entityId: upload.id, clientId: client!.id, summary: action.tool === "rename_document" ? `Document renommé « ${updated.file_name} ».` : `Document déplacé dans « ${updated.category} ».` });
+    return { answer: action.tool === "rename_document" ? `Le document a été renommé « ${updated.file_name} ».` : `Le document « ${updated.file_name} » est maintenant classé dans « ${updated.category} ».`, clientIds: [client!.id], action: "answer" };
+  }
+  if (action.tool === "update_task") {
+    const tasks = await listClientTasks(client!.id); const id = stringArg(action, "task_id"); const title = normalize(stringArg(action, "title"));
+    const matches = tasks.filter((task) => id ? task.id === id : title && normalize(task.title).includes(title));
+    if (matches.length !== 1) return { answer: matches.length ? "Plusieurs tâches correspondent. Précisez le titre exact." : "Tâche introuvable.", clientIds: [client!.id], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Tâche à préciser", clientId: client!.id }] };
+    const status = stringArg(action, "status") as "todo"|"in_progress"|"completed"|"cancelled";
+    if (!["todo", "in_progress", "completed", "cancelled"].includes(status)) return { answer: "Indiquez le nouveau statut : à faire, en cours, terminé ou annulé.", clientIds: [client!.id], action: "answer" };
+    const updated = await updateTask(matches[0].id, { status });
+    return { answer: `La tâche « ${updated.title} » est maintenant « ${status.replaceAll("_", " ")} ».`, clientIds: [client!.id], action: "answer" };
+  }
+  if (["move_appointment", "cancel_appointment"].includes(action.tool)) {
+    const id = stringArg(action, "appointment_id");
+    if (!id) return { answer: "Précisez le rendez-vous concerné avant de continuer.", clientIds: client ? [client.id] : [], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Rendez-vous à préciser" }] };
+    if (action.tool === "cancel_appointment") {
+      const reason = stringArg(action, "reason"); if (!reason) return { answer: "Indiquez la raison de l’annulation.", clientIds: client ? [client.id] : [], action: "answer" };
+      const appointment = await cancelAppointment(id, reason); return { answer: `Le rendez-vous ${appointment.booking_reference} a été annulé.`, clientIds: client ? [client.id] : [], action: "answer" };
+    }
+    const desiredDate = stringArg(action, "desired_date"); if (!desiredDate || Number.isNaN(Date.parse(desiredDate))) return { answer: "Indiquez la nouvelle date et l’heure du rendez-vous.", clientIds: client ? [client.id] : [], action: "answer" };
+    const appointment = await moveAppointment(id, desiredDate); return { answer: `Le rendez-vous ${appointment.booking_reference} a été déplacé au ${new Date(appointment.starts_at).toLocaleString("fr-CA")}.`, clientIds: client ? [client.id] : [], action: "answer" };
+  }
+  return executeLegacyCommand(commandFor(action), selectedClientId);
+}
+
 async function createClientFromPlan(action: JuliePlannedAction): Promise<JulieExecution> {
   const args = action.arguments || {};
   const fullName = stringArg(action, "full_name");
@@ -228,9 +307,7 @@ async function createClientFromPlan(action: JuliePlannedAction): Promise<JulieEx
 }
 
 export async function executeApprovedJulieAction(action: JuliePlannedAction, clientId?: string): Promise<JulieExecution> {
-  return action.tool === "create_client"
-    ? createClientFromPlan(action)
-    : executeLegacyCommand(commandFor(action), clientId);
+  return executePlannedAction(action, clientId);
 }
 
 function commandFor(action: JuliePlannedAction) {
@@ -248,6 +325,8 @@ function commandFor(action: JuliePlannedAction) {
     case "list_pending_approvals": return "Affiche les actions en attente d’approbation";
     case "request_signature": return `Fais signer ${stringArg(action, "document_type") || "la convention"}${client}`;
     case "recommend": return `Analyse et recommande les prochaines étapes${client}`;
+    case "search_records": return `Recherche ${stringArg(action, "query") || stringArg(action, "question")}`;
+    case "generate_report": return "Génère un rapport administratif complet";
     default: return `Consulte et réponds à propos du dossier${client}`;
   }
 }
@@ -275,13 +354,14 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   let workingClientId=plan.ignoreActiveClient?undefined:selectedClientId;
   for (const planned of plan.actions) {
     try {
-      const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature"]);
-      if(executionMode==="approval_all"&&mutating.has(planned.tool)&&planned.tool!=="request_signature"){
-        const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction}});
+      const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature","rename_document","move_document","update_task","move_appointment"]);
+      const alwaysSensitive=new Set(["delete_client","delete_document","cancel_appointment"]);
+      if(alwaysSensitive.has(planned.tool)||(executionMode==="approval_all"&&mutating.has(planned.tool)&&planned.tool!=="request_signature")){
+        const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:alwaysSensitive.has(planned.tool)?`Action sensible : Julie attend votre confirmation explicite avant toute exécution.`:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction}});
         executions.push({answer:`J’ai préparé l’action « ${planned.tool.replaceAll("_"," ")} ». Elle attend votre approbation et aucune modification n’a encore été appliquée.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:planned.tool,status:"needs_input",label:approval.title,clientId:workingClientId}]});
         continue;
       }
-      const execution = planned.tool === "create_client" ? await createClientFromPlan(planned) : await executeLegacyCommand(commandFor(planned), workingClientId);
+      const execution = await executePlannedAction(planned, workingClientId);
       if(execution.clientIds[0])workingClientId=execution.clientIds[0];
       executions.push({ ...execution, actions: execution.actions || [{ tool: planned.tool, status: "completed", label: execution.answer.split("\n")[0], clientId: execution.clientIds[0] }] });
     } catch (error) {
