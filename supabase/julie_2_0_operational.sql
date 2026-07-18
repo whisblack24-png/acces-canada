@@ -5,6 +5,16 @@ alter table public.julie_conversations
     check (execution_mode in ('automatic','approval_all')),
   add column if not exists memory jsonb not null default '{}'::jsonb;
 
+alter table public.client_uploaded_documents
+  drop constraint if exists client_uploaded_documents_type_check;
+alter table public.client_uploaded_documents
+  add constraint client_uploaded_documents_type_check check (lower(file_type) in (
+    'application/pdf','image/jpeg','image/png','application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain','text/csv','application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ));
+
 create table if not exists public.julie_ai_usage_events (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid references public.julie_conversations(id) on delete set null,
