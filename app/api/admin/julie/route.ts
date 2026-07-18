@@ -14,7 +14,7 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   const body = await request.json() as { message?: string; clientId?: string; executionMode?: "automatic"|"approval_all" };
-  const message = String(body.message || "").trim().slice(0, 4000);
+  const message = String(body.message || "").trim().slice(0, 30000);
   if (!message) return NextResponse.json({ error: "Écrivez une demande à Julie." }, { status: 400 });
   try {
     const identity = await getAdminIdentity();

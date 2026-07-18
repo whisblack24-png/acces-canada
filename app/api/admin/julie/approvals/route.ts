@@ -37,7 +37,7 @@ export async function PATCH(request: Request) {
       else if(pending.action_type==="internal_action"){
         const planned=pending.payload.planned as JuliePlannedAction|undefined;
         if(!planned?.tool)throw new Error("Le plan d’action enregistré est incomplet.");
-        result=await executeApprovedJulieAction(planned,pending.client_id||undefined);
+        result=await executeApprovedJulieAction(planned,pending.client_id||undefined,String(pending.payload.instruction||""));
       }else if(pending.action_type==="signature_electronique"&&pending.client_id){const client=await getClient(pending.client_id);if(!client)throw new Error("Client introuvable.");result=await requestSignature(client,String(pending.payload.documentType||"convention") as ClientDocumentType);}
       else throw new Error(`Le type d’action « ${pending.action_type} » n’est pas exécutable.`);
       const row=await finishJulieApproval(body.id,"executed",startedAt,result);

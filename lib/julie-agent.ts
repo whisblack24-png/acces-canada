@@ -12,6 +12,7 @@ import { listClientPayments } from "@/lib/production-workflow";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
 import { addTimelineEvent, createReminder, createTask, listClientTasks, updateTask } from "@/lib/crm";
 import { buildAdminReport } from "@/lib/admin-reports";
+import { createSmartDocument, getSmartDocument, listSmartDocuments, type SmartDocumentKind } from "@/lib/smart-documents";
 import { planJulieInstruction, type JuliePlannedAction } from "@/lib/julie-orchestrator";
 import { createJulieApproval, listJulieApprovals, type JulieMessage } from "@/lib/julie";
 
@@ -228,7 +229,7 @@ async function resolveUpload(action: JuliePlannedAction, client: AdminClient) {
   return matches[0] as ClientUploadedDocument;
 }
 
-async function executePlannedAction(action: JuliePlannedAction, selectedClientId?: string): Promise<JulieExecution> {
+async function executePlannedAction(action: JuliePlannedAction, selectedClientId?: string, originalInstruction=""): Promise<JulieExecution> {
   if (action.tool === "create_client") return createClientFromPlan(action);
   if (action.tool === "search_records") {
     const query = stringArg(action, "query") || action.clientQuery || stringArg(action, "question");
@@ -242,7 +243,32 @@ async function executePlannedAction(action: JuliePlannedAction, selectedClientId
     return { answer: [`Rapport administratif généré à partir des données réelles :`, `- ${totals.clients} client(s), dont ${totals.activeCases} dossier(s) actif(s)`, `- ${totals.uploadedDocuments} document(s) importé(s) et ${totals.generatedDocuments} document(s) généré(s)`, `- ${totals.documentsMissing} pièce(s) signalée(s) manquante(s)`, `- Revenu enregistré : ${totals.revenue.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}`].join("\n"), clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "completed", label: "Rapport CRM calculé" }] };
   }
   const client = await resolvePlannedClient(action, selectedClientId);
-  if (["delete_client", "rename_document", "move_document", "delete_document", "update_task"].includes(action.tool) && !client) return { answer: "Sélectionnez ou nommez précisément le dossier client concerné.", clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Client requis" }] };
+  if (["delete_client", "rename_document", "move_document", "delete_document", "update_task", "create_professional_document", "edit_professional_document", "prepare_complete_case"].includes(action.tool) && !client) return { answer: "Sélectionnez ou nommez précisément le dossier client concerné.", clientIds: [], action: "answer", actions: [{ tool: action.tool, status: "needs_input", label: "Client requis" }] };
+  if (action.tool === "create_professional_document") {
+    const plannedSource=stringArg(action,"source_text"),sourceText=plannedSource==="$USER_MESSAGE"?originalInstruction:plannedSource,title=stringArg(action,"title"),category=stringArg(action,"category"),kind=(stringArg(action,"document_kind")||"autre") as SmartDocumentKind;
+    const missing=[!title&&"le titre",!category&&"la catégorie",sourceText.length<20&&"le texte source"].filter(Boolean);
+    if(missing.length)return{answer:`Il me manque ${missing.join(", ")} pour générer le document professionnel.`,clientIds:[client!.id],action:"answer",actions:[{tool:action.tool,status:"needs_input",label:`Informations requises : ${missing.join(", ")}`,clientId:client!.id}]};
+    const result=await createSmartDocument({client:client!,title,category,kind,sourceText,instruction:stringArg(action,"instruction")||undefined});
+    await Promise.all([addTimelineEvent(client!.id,"Document professionnel créé",`${title} — version ${result.record.version}, Word et PDF classés dans ${category}.`,"julie"),createAuditLog({actorId:"julie",actorType:"system",action:"generate",entityType:"julie_smart_documents",entityId:result.record.id,clientId:client!.id,summary:`${title} généré en Word et PDF par Julie.`,metadata:{version:result.record.version,category,wordUploadId:result.wordUpload.id,pdfUploadId:result.pdfUpload.id}})]);
+    return{answer:`J’ai corrigé et professionnalisé « ${title} », appliqué la mise en page Accès Canada, puis généré et classé les versions Word et PDF dans « ${category} ». La version ${result.record.version} est disponible immédiatement dans les documents du client.`,clientIds:[client!.id],action:"generate_document",actions:[{tool:action.tool,status:"completed",label:`Word et PDF générés — ${title} v${result.record.version}`,clientId:client!.id}]};
+  }
+  if(action.tool==="edit_professional_document"){
+    const id=stringArg(action,"smart_document_id"),title=normalize(stringArg(action,"title")||stringArg(action,"document_name")),instruction=stringArg(action,"instruction");
+    let source=id?await getSmartDocument(id):null;if(!source&&title){const matches=(await listSmartDocuments(client!.id)).filter(item=>normalize(item.title).includes(title));if(matches.length===1)source=matches[0];else if(matches.length>1)return{answer:"Plusieurs versions correspondent. Indiquez l’identifiant ou le titre exact du document.",clientIds:[client!.id],action:"answer",actions:[{tool:action.tool,status:"needs_input",label:"Document à préciser",clientId:client!.id}]};}
+    if(source&&source.client_id!==client!.id)source=null;
+    if(!source||!instruction)return{answer:!source?"Je n’ai pas retrouvé ce document professionnel dans le dossier client sélectionné.":"Décrivez précisément les modifications à appliquer.",clientIds:[client!.id],action:"answer",actions:[{tool:action.tool,status:"needs_input",label:!source?"Document introuvable dans ce dossier":"Instruction de modification requise",clientId:client!.id}]};
+    const result=await createSmartDocument({client:client!,title:source.title,category:source.category,kind:source.document_kind,sourceText:source.professional_text,instruction,parent:source});
+    await Promise.all([addTimelineEvent(client!.id,"Nouvelle version documentaire",`${source.title} — version ${result.record.version}. Instruction : ${instruction}`,"julie"),createAuditLog({actorId:"julie",actorType:"system",action:"version",entityType:"julie_smart_documents",entityId:result.record.id,clientId:client!.id,summary:`Nouvelle version de ${source.title} créée.`,metadata:{parentDocumentId:source.id,version:result.record.version,instruction}})]);
+    return{answer:`J’ai appliqué les modifications demandées à « ${source.title} ». La version ${result.record.version} Word et PDF est enregistrée; les versions antérieures restent dans l’historique.`,clientIds:[client!.id],action:"generate_document",actions:[{tool:action.tool,status:"completed",label:`Nouvelle version créée — v${result.record.version}`,clientId:client!.id}]};
+  }
+  if(action.tool==="prepare_complete_case"){
+    const context=await contextFor(client!),analysis=analyzeDossier(context),existing=new Set(context.tasks.filter(task=>task.status!=="cancelled").map(task=>normalize(task.title))),created=[];
+    for(const title of [...analysis.missingDocuments.map(item=>`Obtenir : ${item}`),...analysis.nextSteps.map(item=>`Étape suivante : ${item}`)].slice(0,15))if(!existing.has(normalize(title)))created.push(await createTask(client!.id,{title,priority:"normal",assignedTo:"julie"}));
+    const existingGenerated=await import("@/lib/admin-documents").then(module=>module.listGeneratedDocumentsForClient(client!.id));const generated=[];
+    const required:ClientDocumentType[]=["checklist-visa","convention"];for(const type of required)if(!existingGenerated.some(item=>item.document_type===type&&item.status==="active")){generated.push(await createGeneratedDocument({client_id:client!.id,client_name:client!.full_name,document_type:type,file_name:documentFileName(client!,type),included_information:{includeSignatures:true,preparedByJulie:true}}));}
+    await createAuditLog({actorId:"julie",actorType:"system",action:"prepare",entityType:"admin_clients",entityId:client!.id,clientId:client!.id,summary:`Dossier complet préparé : ${created.length} tâche(s), ${generated.length} document(s).`,metadata:{missingDocuments:analysis.missingDocuments,generated:generated.map(item=>item.id)}});
+    return{answer:[`J’ai préparé le dossier de ${client!.full_name}.`,`- ${analysis.missingDocuments.length} pièce(s) manquante(s) détectée(s)`,`- ${created.length} nouvelle(s) tâche(s) ajoutée(s) sans doublon`,`- ${generated.length} document(s) administratif(s) généré(s)`,`- Prochaines étapes : ${analysis.nextSteps.join("; ")||"aucune étape supplémentaire détectée"}`].join("\n"),clientIds:[client!.id],action:"create_task",actions:[{tool:action.tool,status:"completed",label:"Dossier analysé et plan de travail préparé",clientId:client!.id}]};
+  }
   if (action.tool === "delete_client") {
     const deleted = await deleteClient(client!.id, "julie");
     await createAuditLog({ actorId: "julie", actorType: "system", action: "delete", entityType: "admin_clients", entityId: client!.id, clientId: client!.id, summary: `Dossier de ${client!.full_name} supprimé après approbation.` });
@@ -306,8 +332,8 @@ async function createClientFromPlan(action: JuliePlannedAction): Promise<JulieEx
   return { answer: `J'ai créé le dossier de ${client.full_name} (${client.file_reference || "référence en cours"}) et je l'ai associé au CRM.`, clientIds: [client.id], action: "create_client", actions: [{ tool: action.tool, status: "completed", label: `Dossier créé : ${client.full_name}`, clientId: client.id }] };
 }
 
-export async function executeApprovedJulieAction(action: JuliePlannedAction, clientId?: string): Promise<JulieExecution> {
-  return executePlannedAction(action, clientId);
+export async function executeApprovedJulieAction(action: JuliePlannedAction, clientId?: string, originalInstruction=""): Promise<JulieExecution> {
+  return executePlannedAction(action, clientId, originalInstruction);
 }
 
 function commandFor(action: JuliePlannedAction) {
@@ -327,6 +353,9 @@ function commandFor(action: JuliePlannedAction) {
     case "recommend": return `Analyse et recommande les prochaines étapes${client}`;
     case "search_records": return `Recherche ${stringArg(action, "query") || stringArg(action, "question")}`;
     case "generate_report": return "Génère un rapport administratif complet";
+    case "create_professional_document": return `Crée un document professionnel ${stringArg(action,"title")}${client}`;
+    case "edit_professional_document": return `Modifie le document ${stringArg(action,"title")}${client}`;
+    case "prepare_complete_case": return `Prépare tous les éléments nécessaires du dossier${client}`;
     default: return `Consulte et réponds à propos du dossier${client}`;
   }
 }
@@ -354,14 +383,14 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   let workingClientId=plan.ignoreActiveClient?undefined:selectedClientId;
   for (const planned of plan.actions) {
     try {
-      const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature","rename_document","move_document","update_task","move_appointment"]);
+      const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature","rename_document","move_document","update_task","move_appointment","create_professional_document","edit_professional_document","prepare_complete_case"]);
       const alwaysSensitive=new Set(["delete_client","delete_document","cancel_appointment"]);
       if(alwaysSensitive.has(planned.tool)||(executionMode==="approval_all"&&mutating.has(planned.tool)&&planned.tool!=="request_signature")){
         const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:alwaysSensitive.has(planned.tool)?`Action sensible : Julie attend votre confirmation explicite avant toute exécution.`:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction}});
         executions.push({answer:`J’ai préparé l’action « ${planned.tool.replaceAll("_"," ")} ». Elle attend votre approbation et aucune modification n’a encore été appliquée.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:planned.tool,status:"needs_input",label:approval.title,clientId:workingClientId}]});
         continue;
       }
-      const execution = await executePlannedAction(planned, workingClientId);
+      const execution = await executePlannedAction(planned, workingClientId, instruction);
       if(execution.clientIds[0])workingClientId=execution.clientIds[0];
       executions.push({ ...execution, actions: execution.actions || [{ tool: planned.tool, status: "completed", label: execution.answer.split("\n")[0], clientId: execution.clientIds[0] }] });
     } catch (error) {
