@@ -10,6 +10,24 @@ const route = readFileSync(new URL("../app/api/admin/julie/route.ts", import.met
 
 test("Julie génère deux formats officiels et les classe dans le CRM", () => {
   for (const contract of [/new Document\(/, /BrandedPdfBuilder/, /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/, /application\/pdf/, /uploadClientFile/, /createClientUpload/, /ACCÈS CANADA/, /PageNumber\.CURRENT/]) assert.match(smart, contract);
+  assert.match(smart,/validateGeneratedDocx\(docx\);validateGeneratedPdf\(pdf\)/);
+  assert.ok(smart.indexOf("validateGeneratedDocx(docx)")<smart.indexOf("insertSmartDocument({client_id"));
+});
+
+test("les fichiers corrompus sont refusés avant Supabase",()=>{
+  const branding=readFileSync(new URL("../lib/document-branding.ts",import.meta.url),"utf8");
+  assert.match(smart,/startsWith\("%PDF-1\.4\\n%"\)/);
+  assert.match(smart,/startxref/);
+  assert.match(smart,/word\/document\.xml/);
+  assert.match(smart,/\[Content_Types\]\.xml/);
+  assert.match(branding,/%\\xE2\\xE3\\xCF\\xD3/);
+});
+
+test("le Markdown devient une mise en forme réelle",()=>{
+  assert.match(smart,/function plainMarkdown/);
+  assert.match(smart,/function richRuns/);
+  assert.match(smart,/bold:true/);
+  assert.doesNotMatch(smart,/pdfText\(line,48,y[^\n]+\*\*/);
 });
 
 test("la réécriture IA interdit l’invention de faits", () => {

@@ -381,10 +381,21 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   if (plan.clarification && !plan.actions.length) return { answer: plan.clarification, clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification }] };
   const executions: JulieExecution[] = [];
   let workingClientId=plan.ignoreActiveClient?undefined:selectedClientId;
+  const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature","rename_document","move_document","update_task","move_appointment","create_professional_document","edit_professional_document","prepare_complete_case"]);
+  const alwaysSensitive=new Set(["delete_client","delete_document","cancel_appointment"]);
+  const batchActions=executionMode==="approval_all"?plan.actions.filter(item=>(mutating.has(item.tool)||alwaysSensitive.has(item.tool))&&item.tool!=="request_signature"):[];
+  let batchApprovalCreated=false;
   for (const planned of plan.actions) {
     try {
-      const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature","rename_document","move_document","update_task","move_appointment","create_professional_document","edit_professional_document","prepare_complete_case"]);
-      const alwaysSensitive=new Set(["delete_client","delete_document","cancel_appointment"]);
+      if(batchActions.includes(planned)){
+        if(!batchApprovalCreated){
+          const labels=batchActions.map(item=>item.tool.replaceAll("_"," "));
+          const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Plan Julie à approuver — ${batchActions.length} action(s)`,description:`Actions qui seront exécutées ensemble : ${labels.join("; ")}.`,payload:{plannedActions:batchActions,instruction}});
+          executions.push({answer:`J’ai regroupé ${batchActions.length} action(s) dans une seule validation :\n${labels.map(label=>`- ${label}`).join("\n")}\n\nUtilisez « Approuver et exécuter tout » pour lancer le plan complet.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:"batch_approval",status:"needs_input",label:approval.title,clientId:workingClientId}]});
+          batchApprovalCreated=true;
+        }
+        continue;
+      }
       if(alwaysSensitive.has(planned.tool)||(executionMode==="approval_all"&&mutating.has(planned.tool)&&planned.tool!=="request_signature")){
         const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:alwaysSensitive.has(planned.tool)?`Action sensible : Julie attend votre confirmation explicite avant toute exécution.`:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction}});
         executions.push({answer:`J’ai préparé l’action « ${planned.tool.replaceAll("_"," ")} ». Elle attend votre approbation et aucune modification n’a encore été appliquée.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:planned.tool,status:"needs_input",label:approval.title,clientId:workingClientId}]});

@@ -36,8 +36,11 @@ export async function PATCH(request: Request) {
       if(pending.action_type==="document_review"&&pending.client_id) result=await approveDocumentReview({uploadId:String(pending.payload.uploadId||""),analysisId:String(pending.payload.analysisId||"")||undefined,clientId:pending.client_id,reviewedBy:undefined,category:body.category});
       else if(pending.action_type==="internal_action"){
         const planned=pending.payload.planned as JuliePlannedAction|undefined;
-        if(!planned?.tool)throw new Error("Le plan d’action enregistré est incomplet.");
-        result=await executeApprovedJulieAction(planned,pending.client_id||undefined,String(pending.payload.instruction||""));
+        const plannedActions=Array.isArray(pending.payload.plannedActions)?pending.payload.plannedActions as JuliePlannedAction[]:planned?[planned]:[];
+        if(!plannedActions.length||plannedActions.some(item=>!item?.tool))throw new Error("Le plan d’action enregistré est incomplet.");
+        const results=[];let activeClientId=pending.client_id||undefined;
+        for(const item of plannedActions){const execution=await executeApprovedJulieAction(item,activeClientId,String(pending.payload.instruction||""));if(execution.clientIds[0])activeClientId=execution.clientIds[0];results.push(execution);}
+        result={executed:results.length,results};
       }else if(pending.action_type==="signature_electronique"&&pending.client_id){const client=await getClient(pending.client_id);if(!client)throw new Error("Client introuvable.");result=await requestSignature(client,String(pending.payload.documentType||"convention") as ClientDocumentType);}
       else throw new Error(`Le type d’action « ${pending.action_type} » n’est pas exécutable.`);
       const row=await finishJulieApproval(body.id,"executed",startedAt,result);
