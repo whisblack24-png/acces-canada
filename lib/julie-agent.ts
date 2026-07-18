@@ -369,6 +369,14 @@ function commandFor(action: JuliePlannedAction) {
 }
 
 export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = [], executionMode:"automatic"|"approval_all"="automatic",runtime?:{conversationId?:string;workingMemory?:Record<string,unknown>;globalMemory?:Array<{memory_type:string;content:string}>}): Promise<JulieExecution> {
+  const recallRequest=/derni[eè]re (?:t[aâ]che|action)|(?:viens|venais) (?:de|d['’])ex[eé]cuter|qu['’]est-ce que tu (?:as|avais) fait|reprends? (?:le travail|la mission|o[uù] tu)/i.test(instruction);
+  if(recallRequest){
+    const lastAnswer=typeof runtime?.workingMemory?.lastAnswer==="string"?runtime.workingMemory.lastAnswer:"";
+    const lastRequest=typeof runtime?.workingMemory?.lastUserRequest==="string"?runtime.workingMemory.lastUserRequest:"";
+    const lastActions=Array.isArray(runtime?.workingMemory?.lastActions)?runtime.workingMemory.lastActions as Array<{tool?:string;status?:string;label?:string}>:[];
+    if(lastAnswer||lastActions.length)return{answer:["Voici le dernier travail que j’ai effectué :",lastRequest?`- Demande : ${lastRequest}`:"",...lastActions.map(action=>`- ${action.label||action.tool||"Action"} — ${(action.status||"terminée").replaceAll("_"," ")}`),lastAnswer?`\nRésultat enregistré :\n${lastAnswer}`:""].filter(Boolean).join("\n"),clientIds:selectedClientId?[selectedClientId]:[],action:"answer",actions:[{tool:"recall_context",status:"completed",label:"Dernière tâche retrouvée dans la mémoire persistante",clientId:selectedClientId}]};
+    return{answer:"Je n’ai trouvé aucune tâche antérieure dans cette conversation persistante.",clientIds:selectedClientId?[selectedClientId]:[],action:"answer",actions:[{tool:"recall_context",status:"needs_input",label:"Aucune tâche antérieure enregistrée",clientId:selectedClientId}]};
+  }
   const arithmetic = normalize(instruction).match(/(?:combien (?:font|fait)|calcule)\s+(-?\d+(?:[.,]\d+)?)\s*([+\-x*\/])\s*(-?\d+(?:[.,]\d+)?)/);
   if (arithmetic) {
     const left = Number(arithmetic[1].replace(",", ".")), right = Number(arithmetic[3].replace(",", "."));

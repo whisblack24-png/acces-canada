@@ -6,7 +6,7 @@ export type JulieToolName =
   | "analyze_documents" | "generate_document" | "create_task"
   | "create_reminder" | "update_client" | "add_note"
   | "list_appointments" | "list_pending_approvals"
-  | "request_signature" | "recommend" | "answer_from_records"
+  | "request_signature" | "recommend" | "answer_from_records" | "recall_context"
   | "search_records" | "delete_client" | "rename_document"
   | "move_document" | "delete_document" | "update_task"
   | "move_appointment" | "cancel_appointment" | "generate_report"
@@ -25,7 +25,7 @@ export type JuliePlan = {
   actions: JuliePlannedAction[];
 };
 
-const tools: JulieToolName[] = ["create_client", "summarize_client", "list_incomplete_clients", "analyze_documents", "generate_document", "create_task", "create_reminder", "update_client", "add_note", "list_appointments", "list_pending_approvals", "request_signature", "recommend", "answer_from_records", "search_records", "delete_client", "rename_document", "move_document", "delete_document", "update_task", "move_appointment", "cancel_appointment", "generate_report", "create_professional_document", "edit_professional_document", "merge_professional_documents", "prepare_complete_case"];
+const tools: JulieToolName[] = ["create_client", "summarize_client", "list_incomplete_clients", "analyze_documents", "generate_document", "create_task", "create_reminder", "update_client", "add_note", "list_appointments", "list_pending_approvals", "request_signature", "recommend", "answer_from_records", "recall_context", "search_records", "delete_client", "rename_document", "move_document", "delete_document", "update_task", "move_appointment", "cancel_appointment", "generate_report", "create_professional_document", "edit_professional_document", "merge_professional_documents", "prepare_complete_case"];
 
 function credentials() {
   if (process.env.OPENAI_API_KEY) return { url: "https://api.openai.com/v1/chat/completions", token: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL || "gpt-5.4" };

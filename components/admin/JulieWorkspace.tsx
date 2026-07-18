@@ -8,6 +8,7 @@ type Client={id:string;full_name:string;file_reference?:string|null};
 type Uploaded={id:string;client_id:string;file_name:string;file_type?:string|null;category:string;status:string;created_at:string};
 type Generated={id:string;client_id:string;client_name:string;file_name:string;document_label:string;status:string;created_at:string};
 type UploadProgress={name:string;status:"waiting"|"uploading"|"completed"|"error";message?:string};
+type ImportedAttachment={id:string;name:string;clientId:string};
 type Task={id:string;title:string;status:"todo"|"in_progress"|"completed"|"cancelled";priority:string;due_at:string|null};
 type JulieAction={tool:string;status:"completed"|"needs_input"|"failed";label:string;clientId?:string};
 type RuntimeState={goals:Array<{id:string;objective:string;status:string;created_at:string}>;actions:Array<{id:string;goal_run_id:string|null;tool:string;status:string;action_index:number;error:string|null}>};
@@ -45,12 +46,12 @@ export function JulieWorkspace(){
   const loadDocuments=useCallback(async()=>{const[u,g]=await Promise.all([fetch("/api/admin/client-uploads",{cache:"no-store"}),fetch("/api/admin/documents",{cache:"no-store"})]);if(u.ok){const data=await u.json() as{uploads?:Uploaded[]};setUploads((data.uploads||[]).filter(x=>x.status==="active"));}if(g.ok){const data=await g.json() as{documents?:Generated[]};setGenerated((data.documents||[]).filter(x=>x.status==="active"));}},[]);
   useEffect(()=>{fetch("/api/admin/julie").then(r=>r.json()).then((data:{clientId?:string|null;executionMode?:"automatic"|"approval_all";runtime?:RuntimeState;messages?:Array<{role:string;content:string}>})=>{setEntries(data.messages?.map(m=>({role:m.role==="julie"?"julie":"director",content:m.content}))||[]);if(data.clientId)setClientId(data.clientId);if(data.executionMode)setExecutionMode(data.executionMode);if(data.runtime)setRuntime(data.runtime);}).catch(()=>setError("Historique indisponible."));fetch("/api/admin/clients").then(r=>r.json()).then((data:{clients?:Client[]})=>setClients([{id:"auto",full_name:"Détection automatique par Julie"},...(data.clients||[])])).catch(()=>setError("Dossiers clients indisponibles."));void loadDocuments();const timer=window.setInterval(loadDocuments,5000);const focus=()=>void loadDocuments();window.addEventListener("focus",focus);return()=>{window.clearInterval(timer);window.removeEventListener("focus",focus);};},[loadDocuments]);
   useEffect(()=>{if(clientId==="auto"){setTasks([]);return;}fetch(`/api/admin/clients/${clientId}/tasks`,{cache:"no-store"}).then(r=>r.json()).then((data:{tasks?:Task[]})=>setTasks(data.tasks||[])).catch(()=>setTasks([]));},[clientId,entries]);
-  async function send(){const value=message.trim();if((!value&&!selectedFiles.length)||busy)return;const instruction=value||"Importe, analyse et classe les documents sélectionnés.";setEntries(v=>[...v,{role:"director",content:instruction}]);setMessage("");setBusy(true);setError("");setActionResults([]);try{const r=await fetch("/api/admin/julie",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:instruction,clientId:clientId!=="auto"?clientId:undefined,executionMode})}),data=await r.json() as{answer?:string;error?:string;actions?:JulieAction[];clientIds?:string[];runtime?:RuntimeState};if(r.ok){setEntries(v=>[...v,{role:"julie",content:data.answer||"Demande reçue."}]);setActionResults(data.actions||[]);if(data.runtime)setRuntime(data.runtime);const resolved=data.clientIds?.[0]||data.actions?.find(action=>action.clientId)?.clientId||(clientId!=="auto"?clientId:undefined);if(resolved)setClientId(resolved);if(selectedFiles.length)await importFiles(selectedFiles,resolved||clientId);}else setError(data.error||"Julie est indisponible.");}finally{setBusy(false);}}
+  async function send(){const value=message.trim();if((!value&&!selectedFiles.length)||busy)return;const instruction=value||"Importe, analyse et classe les documents sélectionnés.";const files=[...selectedFiles];setEntries(v=>[...v,{role:"director",content:instruction}]);setMessage("");setBusy(true);setError("");setActionResults([]);try{const imported=files.length?await importFiles(files):{attachments:[] as ImportedAttachment[],resolvedClientId:clientId!=="auto"?clientId:undefined};const resolvedBeforeReply=imported.resolvedClientId||(clientId!=="auto"?clientId:undefined);if(files.length&&!imported.attachments.length)throw new Error("Aucun document n’a pu être importé. Corrigez les erreurs affichées avant de demander l’analyse.");if(resolvedBeforeReply)setClientId(resolvedBeforeReply);const r=await fetch("/api/admin/julie",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:instruction,clientId:resolvedBeforeReply,executionMode,attachments:imported.attachments})}),data=await r.json() as{answer?:string;error?:string;actions?:JulieAction[];clientIds?:string[];runtime?:RuntimeState};if(r.ok){setEntries(v=>[...v,{role:"julie",content:data.answer||"Demande reçue."}]);setActionResults(data.actions||[]);if(data.runtime)setRuntime(data.runtime);const resolved=data.clientIds?.[0]||data.actions?.find(action=>action.clientId)?.clientId||resolvedBeforeReply;if(resolved)setClientId(resolved);}else setError(data.error||"Julie est indisponible.");}catch(error){setError(error instanceof Error?error.message:"Julie est indisponible.");}finally{setBusy(false);}}
   async function importFiles(files:File[],targetClientId=clientId){
-    if(!files.length)return;
+    if(!files.length)return{attachments:[] as ImportedAttachment[],resolvedClientId:targetClientId!=="auto"?targetClientId:undefined};
     setUploading(true);setNotice(`Julie traite ${files.length} document${files.length>1?"s":""}…`);
     setUploadProgress(files.map(file=>({name:file.name,status:"waiting"})));
-    let completed=0;
+    let completed=0;const attachments:ImportedAttachment[]=[];let resolvedClientId=targetClientId&&targetClientId!=="auto"?targetClientId:undefined;
     let cursor=0;
     async function worker(){
       while(cursor<files.length){
@@ -59,9 +60,9 @@ export function JulieWorkspace(){
       const form=new FormData();if(targetClientId&&targetClientId!=="auto")form.set("clientId",targetClientId);form.append("files",file);
       try{
         const response=await fetch("/api/admin/client-uploads",{method:"POST",body:form});
-        const data=await response.json() as{message?:string;uploads?:Uploaded[]};
+        const data=await response.json() as{message?:string;uploads?:Uploaded[];resolvedClientId?:string};
         if(!response.ok)throw new Error(data.message||"Importation impossible.");
-        completed++;
+        completed++;resolvedClientId=data.resolvedClientId||resolvedClientId;for(const upload of data.uploads||[])attachments.push({id:upload.id,name:upload.file_name,clientId:upload.client_id});
         const analysis=(data.uploads?.[0] as Uploaded&{analysis?:{detected_type?:string;confidence?:number}}|undefined)?.analysis;
         setUploadProgress(current=>current.map((row,i)=>i===index?{...row,status:"completed",message:analysis?.detected_type?`${analysis.detected_type} · ${Math.round((analysis.confidence||0)*100)} %`:"Importé et classé"}:row));
       }catch(error){
@@ -71,7 +72,7 @@ export function JulieWorkspace(){
     }
     await Promise.all(Array.from({length:Math.min(3,files.length)},()=>worker()));
     setNotice(`${completed}/${files.length} document(s) importé(s), analysé(s) et classé(s).`);
-    await loadDocuments();setUploading(false);setSelectedFiles([]);if(inputRef.current)inputRef.current.value="";
+    await loadDocuments();setUploading(false);setSelectedFiles([]);if(inputRef.current)inputRef.current.value="";return{attachments,resolvedClientId};
   }
   function queueFiles(files:File[]){setSelectedFiles(current=>{const known=new Set(current.map(file=>`${file.name}:${file.size}:${file.lastModified}`));return [...current,...files.filter(file=>!known.has(`${file.name}:${file.size}:${file.lastModified}`))];});}
   function drop(event:DragEvent<HTMLDivElement>){event.preventDefault();setDragging(false);queueFiles(Array.from(event.dataTransfer.files));}

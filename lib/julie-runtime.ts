@@ -1,6 +1,6 @@
 import "server-only";
 
-export type JulieWorkingMemory={activeClientId?:string;activeClientName?:string;currentObjective?:string;lastUserRequest?:string;lastAnswer?:string;lastActions?:Array<{tool:string;status:string;label:string;clientId?:string}>;pendingApprovalIds?:string[];generatedDocumentIds?:string[];updatedAt?:string};
+export type JulieWorkingMemory={activeClientId?:string;activeClientName?:string;currentObjective?:string;lastUserRequest?:string;lastAnswer?:string;lastActions?:Array<{tool:string;status:string;label:string;clientId?:string}>;pendingApprovalIds?:string[];generatedDocumentIds?:string[];recentDocuments?:Array<{id:string;name:string;clientId:string}>;updatedAt?:string};
 export type JulieActionRun={id:string;status:"pending"|"awaiting_approval"|"executing"|"completed"|"failed"|"cancelled";output:Record<string,unknown>|null;error:string|null;attempt_count:number};
 export type JulieGlobalMemory={id:string;client_id:string|null;memory_type:string;content:string;metadata:Record<string,unknown>;importance:number;updated_at:string};
 export type JulieRuntimeState={goals:Array<{id:string;objective:string;status:string;client_id:string|null;created_at:string;updated_at:string}>;actions:Array<{id:string;goal_run_id:string|null;tool:string;status:string;action_index:number;error:string|null;updated_at:string}>};
