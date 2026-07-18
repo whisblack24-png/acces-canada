@@ -31,7 +31,10 @@ test("le Markdown devient une mise en forme réelle",()=>{
 });
 
 test("la réécriture IA interdit l’invention de faits", () => {
-  assert.match(smart, /sans inventer aucun fait, montant, date, identité ou engagement juridique/);
+  assert.match(smart, /Interdictions : inventer une identité, date, somme, règle juridique/);
+  assert.match(smart,/response_format:\{type:"json_schema"/);
+  assert.match(smart,/TRANSFORMER réellement le brouillon/);
+  assert.match(smart,/sourceNorm===textNorm/);
   assert.match(smart, /source\.slice\(0,30000\)/);
   assert.match(route, /slice\(0, 30000\)/);
 });

@@ -7,7 +7,7 @@ const agent = readFileSync(new URL("../lib/julie-agent.ts", import.meta.url), "u
 const workspace = readFileSync(new URL("../components/admin/JulieWorkspace.tsx", import.meta.url), "utf8");
 
 test("Julie expose les outils CRM et documentaires de production", () => {
-  for (const tool of ["search_records", "delete_client", "rename_document", "move_document", "delete_document", "update_task", "move_appointment", "cancel_appointment", "generate_report"]) {
+  for (const tool of ["search_records", "delete_client", "rename_document", "move_document", "delete_document", "update_task", "move_appointment", "cancel_appointment", "generate_report", "merge_professional_documents"]) {
     assert.match(orchestrator, new RegExp(`"${tool}"`));
     assert.match(agent, new RegExp(`"${tool}"`));
   }

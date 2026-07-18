@@ -31,7 +31,7 @@ function pdfCircle(cx:number,cy:number,r:number,color:string,fill=false,width=1)
 export function documentDate(value?:string|null){return formatDateFr(value || new Date());}
 export function verificationUrl(token?:string|null){const base=(process.env.NEXT_PUBLIC_SITE_URL||process.env.APP_URL||"https://acces-canada.vercel.app").replace(/\/$/,"");return token?`${base}/document/verifier/${encodeURIComponent(token)}`:`${base}/document/verifier`;}
 
-export function qrCodeCommands(value:string,x:number,y:number,size:number){const qr=QRCode.create(value,{errorCorrectionLevel:"M"}),count=qr.modules.size,quiet=3,cell=size/(count+quiet*2);let out=pdfRect(x,y,size,size,"1 1 1");for(let row=0;row<count;row++)for(let col=0;col<count;col++)if(qr.modules.get(row,col))out+=pdfRect(x+(col+quiet)*cell,y+size-(row+quiet+1)*cell,cell+.08,cell+.08,PDF_NAVY);return out;}
+export function qrCodeCommands(value:string,x:number,y:number,size:number){const qr=QRCode.create(value,{errorCorrectionLevel:"Q"}),count=qr.modules.size,quiet=4,cell=size/(count+quiet*2);let out=pdfRect(x,y,size,size,"1 1 1");for(let row=0;row<count;row++)for(let col=0;col<count;col++)if(qr.modules.get(row,col))out+=pdfRect(x+(col+quiet)*cell,y+size-(row+quiet+1)*cell,cell+.04,cell+.04,PDF_NAVY);return out;}
 
 export function watermarkCommands(pageWidth=612,pageHeight=792){const cx=pageWidth/2,cy=pageHeight/2;return [
   pdfCircle(cx,cy,128,"0.955 0.960 0.968",true),
@@ -62,7 +62,7 @@ export function digitalSignatureCertificateCommands(meta:DocumentBrandMetadata,x
   ].join("");
 }
 
-export function premiumFooterCommands(meta:DocumentBrandMetadata,page:number,total:number,pageWidth=612){const url=verificationUrl(meta.verificationToken);return [pdfLine(32,58,pageWidth-32,58,PDF_GOLD,1),pdfText("AC",32,35,12,"F2",PDF_GOLD),pdfText(`${brand.phone}  |  ${brand.email}`,58,38,7.5,"F1",PDF_MUTED),pdfText(meta.documentNumber,58,26,7,"F2",PDF_NAVY),pdfText("Document confidentiel - Acces Canada",238,26,6.5,"F1",PDF_MUTED),pdfText(`Page ${page} sur ${total}`,pageWidth-150,32,7.5,"F2",PDF_NAVY),meta.verificationToken?qrCodeCommands(url,pageWidth-66,8,42):""].join("");}
+export function premiumFooterCommands(meta:DocumentBrandMetadata,page:number,total:number,pageWidth=612){const url=verificationUrl(meta.verificationToken);return [pdfLine(32,64,pageWidth-32,64,PDF_GOLD,1),pdfText("AC",32,39,12,"F2",PDF_GOLD),pdfText(`${brand.phone}  |  ${brand.email}`,58,42,7.5,"F1",PDF_MUTED),pdfText(meta.documentNumber,58,30,7,"F2",PDF_NAVY),pdfText("Document confidentiel - Acces Canada",238,30,6.5,"F1",PDF_MUTED),pdfText(`Page ${page} sur ${total}`,pageWidth-150,36,7.5,"F2",PDF_NAVY),meta.verificationToken?qrCodeCommands(url,pageWidth-78,6,54):""].join("");}
 
 export class BrandedPdfBuilder {
   private pages:string[]=[];

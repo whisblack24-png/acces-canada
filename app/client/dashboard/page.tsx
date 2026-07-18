@@ -323,12 +323,12 @@ export default async function ClientDashboardPage() {
           </div>
         </ClientPanel>
 
-        <ClientPanel
+        <div id="messagerie"><ClientPanel
           title="Messagerie sécurisée"
           icon={<Bell className="h-5 w-5" />}
         >
           <SecureMessages initialMessages={messages} />
-        </ClientPanel>
+        </ClientPanel></div>
 
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <ClientPanel

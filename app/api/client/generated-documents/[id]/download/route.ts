@@ -4,6 +4,7 @@ import { getClient } from "@/lib/admin-data";
 import { getGeneratedDocument } from "@/lib/admin-documents";
 import { generateClientPdf } from "@/lib/pdf-documents";
 import { getDocumentSignatureConfig } from "@/lib/signature-settings";
+import { assertDownloadableFile, downloadHeaders } from "@/lib/file-download";
 
 export const runtime = "nodejs";
 
@@ -26,11 +27,7 @@ export async function GET(_request: Request, context: Context) {
 
   const signatures=await getDocumentSignatureConfig();
   const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, {}, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true }, signatures);
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${document.file_name}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  try{assertDownloadableFile(pdf,document.file_name);}catch(error){return NextResponse.json({message:error instanceof Error?error.message:"PDF invalide."},{status:500});}
+  const headers=downloadHeaders(document.file_name,"application/pdf");headers["Content-Length"]=String(pdf.length);
+  return new Response(new Uint8Array(pdf),{headers});
 }

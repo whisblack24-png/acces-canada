@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { downloadClientFile } from "@/lib/client-portal";
+import { assertDownloadableFile, downloadHeaders } from "@/lib/file-download";
 
 export const runtime = "nodejs";
 
@@ -29,11 +30,7 @@ export async function GET(request: Request, context: Context) {
 
   if (!result) return NextResponse.json({ message: "Document introuvable." }, { status: 404 });
 
-  return new Response(new Uint8Array(result.bytes), {
-    headers: {
-      "Content-Type": result.record.file_type || "application/octet-stream",
-      "Content-Disposition": `${disposition}; filename="${result.record.file_name.replace(/["\r\n]/g, "-")}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  try{assertDownloadableFile(result.bytes,result.record.file_name);}catch(error){return NextResponse.json({message:error instanceof Error?error.message:"Fichier invalide."},{status:422});}
+  const headers=downloadHeaders(result.record.file_name,result.record.file_type,disposition);headers["Content-Length"]=String(result.bytes.length);
+  return new Response(new Uint8Array(result.bytes),{headers});
 }

@@ -5,6 +5,7 @@ import { getGeneratedDocument } from "@/lib/admin-documents";
 import { generateClientPdf } from "@/lib/pdf-documents";
 import { getDecryptedQuestionnaires } from "@/lib/questionnaires";
 import { getDocumentSignatureConfig } from "@/lib/signature-settings";
+import { assertDownloadableFile, downloadHeaders } from "@/lib/file-download";
 
 export const runtime = "nodejs";
 
@@ -31,12 +32,8 @@ export async function GET(_request: Request, context: Context) {
   const [questionnaires,signatures] = await Promise.all([getDecryptedQuestionnaires(client.id),getDocumentSignatureConfig()]);
   const data = Object.fromEntries(questionnaires.map(({ row, answers }) => [row.questionnaire_type === "client_principal" ? "client" : "guarantor", answers]));
   const pdf = generateClientPdf(client, document.document_type, { ...(document.included_information || {}), includeSignatures: true }, data, { documentNumber: document.document_number, verificationToken: document.verification_token, authenticityHash: document.authenticity_hash, version: document.version, status: document.status, createdAt: document.issued_at || document.created_at, digitallySigned: true }, signatures);
+  try{assertDownloadableFile(pdf,document.file_name);}catch(error){return NextResponse.json({message:error instanceof Error?error.message:"PDF invalide."},{status:500});}
+  const headers=downloadHeaders(document.file_name,"application/pdf");headers["Content-Length"]=String(pdf.length);
 
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${document.file_name}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+  return new Response(new Uint8Array(pdf),{headers});
 }

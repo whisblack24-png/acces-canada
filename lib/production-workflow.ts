@@ -95,7 +95,7 @@ export async function notifyClient(client: AdminClient, subject: string, message
 
   if (!host || !user || !pass || !from) {
     console.warn("Notification courriel ignorée: configuration SMTP incomplète.");
-    return;
+    return false;
   }
 
   await sendSmtpMail({
@@ -109,6 +109,7 @@ export async function notifyClient(client: AdminClient, subject: string, message
     subject,
     text: message,
   });
+  return true;
 }
 
 export async function notifyDossierCreated(client: AdminClient) {

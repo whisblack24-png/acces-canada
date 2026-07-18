@@ -16,6 +16,12 @@ export type ClientUploadedDocument = {
   replaced_document_id: string | null;
   deleted_at: string | null;
   uploaded_by: string;
+  visible_to_client?: boolean;
+  portal_summary?: string | null;
+  portal_actions?: string[];
+  portal_deadline?: string | null;
+  shared_at?: string | null;
+  viewed_at?: string | null;
 };
 
 export type ClientMessage = {
@@ -309,6 +315,17 @@ export async function renameClientUpload(clientId:string,uploadId:string,fileNam
   const response=await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}&status=eq.active`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify({file_name:fileName,updated_at:new Date().toISOString()})});
   if(!response.ok)await fail("Renommage document client",response);
   const row=((await response.json()) as ClientUploadedDocument[])[0];if(!row)throw new Error("Document introuvable.");return row;
+}
+
+export async function shareClientUpload(input:{clientId:string;uploadId:string;summary:string;actions:string[];deadline?:string|null}){
+  const{url,key,uploadsTable}=config();const now=new Date().toISOString();
+  const response=await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(input.uploadId)}&client_id=eq.${encodeURIComponent(input.clientId)}&status=eq.active`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify({visible_to_client:true,portal_summary:input.summary.slice(0,4000),portal_actions:input.actions.slice(0,12),portal_deadline:input.deadline||null,shared_at:now,viewed_at:null,updated_at:now})});
+  if(!response.ok)await fail("Envoi du document au portail",response);const row=((await response.json()) as ClientUploadedDocument[])[0];if(!row)throw new Error("Document introuvable dans ce dossier.");return row;
+}
+
+export async function markClientDocumentViewed(clientId:string,uploadId:string){
+  const{url,key,uploadsTable}=config();const response=await fetch(`${url}/rest/v1/${uploadsTable}?id=eq.${encodeURIComponent(uploadId)}&client_id=eq.${encodeURIComponent(clientId)}&visible_to_client=eq.true&viewed_at=is.null`,{method:"PATCH",headers:{...headers(key),Prefer:"return=representation"},body:JSON.stringify({viewed_at:new Date().toISOString()})});
+  if(!response.ok)return null;return((await response.json()) as ClientUploadedDocument[])[0]||null;
 }
 
 export async function updateClientUploadMetadata(clientId:string,uploadId:string,input:{fileName?:string;category?:string}){
