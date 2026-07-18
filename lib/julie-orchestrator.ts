@@ -21,8 +21,6 @@ export type JuliePlan = {
 const tools = ["create_client", "summarize_client", "list_incomplete_clients", "analyze_documents", "generate_document", "create_task", "request_signature", "recommend", "answer_from_records"];
 
 function credentials() {
-  const gateway = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
-  if (gateway) return { url: "https://ai-gateway.vercel.sh/v1/chat/completions", token: gateway, model: process.env.JULIE_MODEL || "openai/gpt-5.4" };
   if (process.env.OPENAI_API_KEY) return { url: "https://api.openai.com/v1/chat/completions", token: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL || "gpt-5.4" };
   return null;
 }

@@ -14,8 +14,8 @@ function headers(prefer?:string){const{key}=config();return{apikey:key,Authoriza
 async function checked(r:Response){if(!r.ok)throw new Error(await r.text());return r;}
 function clean(value:unknown){return typeof value==="string"?value.trim():"";}
 
-function fallback(name:string,clientName:string,code="AI_NOT_CONFIGURED",detail="Aucun jeton AI Gateway ou OpenAI n’est disponible dans l’environnement de production."){const result=classifyExtractedDocument("",name,clientName);return{...result,summary:`Analyse intelligente non exécutée (${code}). ${detail}`,suggested_category:"a_verifier",extracted_fields:{...result.extracted_fields,diagnostic_code:code,diagnostic_detail:detail},confidence:0};}
-function aiConfig(){const gateway=process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN;if(gateway)return{url:"https://ai-gateway.vercel.sh/v1/responses",token:gateway,model:process.env.OPENAI_VISION_MODEL||"openai/gpt-5.4"};if(process.env.OPENAI_API_KEY)return{url:"https://api.openai.com/v1/responses",token:process.env.OPENAI_API_KEY,model:process.env.OPENAI_VISION_MODEL||process.env.OPENAI_MODEL||"gpt-5.4"};return null;}
+function fallback(name:string,clientName:string,code="AI_NOT_CONFIGURED",detail="OPENAI_API_KEY n’est pas disponible dans l’environnement de production."){const result=classifyExtractedDocument("",name,clientName);return{...result,summary:`Analyse intelligente non exécutée (${code}). ${detail}`,suggested_category:"a_verifier",extracted_fields:{...result.extracted_fields,diagnostic_code:code,diagnostic_detail:detail},confidence:0};}
+function aiConfig(){if(process.env.OPENAI_API_KEY)return{url:"https://api.openai.com/v1/responses",token:process.env.OPENAI_API_KEY,model:process.env.OPENAI_VISION_MODEL||process.env.OPENAI_MODEL||"gpt-5.4"};return null;}
 async function intelligent(bytes:Buffer,file:ClientUploadedDocument,clientName:string):Promise<IntelligentDocumentResult>{
   const ai=aiConfig();if(!ai)return fallback(file.file_name,clientName);
   const base64=bytes.toString("base64"),isImage=file.file_type?.startsWith("image/");
