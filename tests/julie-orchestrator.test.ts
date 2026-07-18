@@ -8,7 +8,7 @@ const agent=readFileSync(new URL("../lib/julie-agent.ts",import.meta.url),"utf8"
 test("Julie utilise un plan d'outils structuré produit par le modèle",()=>{
   assert.match(orchestrator,/response_format:\s*\{ type: "json_schema"/);
   assert.match(orchestrator,/maxItems: 8/);
-  assert.match(agent,/for \(const planned of plan\.actions\)/);
+  assert.match(agent,/for \(const \[actionIndex,\s*planned\] of plan\.actions\.entries\(\)\)/);
 });
 
 test("la création d'un nouveau client isole le client actif et contrôle les doublons",()=>{
