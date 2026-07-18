@@ -227,6 +227,12 @@ async function createClientFromPlan(action: JuliePlannedAction): Promise<JulieEx
   return { answer: `J'ai créé le dossier de ${client.full_name} (${client.file_reference || "référence en cours"}) et je l'ai associé au CRM.`, clientIds: [client.id], action: "create_client", actions: [{ tool: action.tool, status: "completed", label: `Dossier créé : ${client.full_name}`, clientId: client.id }] };
 }
 
+export async function executeApprovedJulieAction(action: JuliePlannedAction, clientId?: string): Promise<JulieExecution> {
+  return action.tool === "create_client"
+    ? createClientFromPlan(action)
+    : executeLegacyCommand(commandFor(action), clientId);
+}
+
 function commandFor(action: JuliePlannedAction) {
   const client = action.clientQuery ? ` pour ${action.clientQuery}` : "";
   switch (action.tool) {
