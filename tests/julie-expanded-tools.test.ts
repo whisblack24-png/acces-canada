@@ -20,10 +20,10 @@ test("les opérations irréversibles exigent toujours une approbation", () => {
 
 test("les plans multi-actions utilisent une approbation unique",()=>{
   const approvals=readFileSync(new URL("../app/api/admin/julie/approvals/route.ts",import.meta.url),"utf8");
-  assert.match(agent,/payload:\{plannedActions:batchActions,instruction\}/);
+  assert.match(agent,/payload:\{plannedActions:batchActions,instruction,conversationId:runtime\?\.conversationId,goalRunId:goalRun\?\.id\}/);
   assert.match(agent,/Plan Julie à approuver/);
   assert.match(approvals,/pending\.payload\.plannedActions/);
-  assert.match(approvals,/for\(const item of plannedActions\)/);
+  assert.match(approvals,/for\(const\[index,item\]of plannedActions\.entries\(\)\)/);
 });
 
 test("l’interface affiche la progression et les outils utilisés", () => {

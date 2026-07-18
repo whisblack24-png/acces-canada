@@ -15,6 +15,7 @@ import { buildAdminReport } from "@/lib/admin-reports";
 import { createSmartDocument, getSmartDocument, listSmartDocuments, type SmartDocumentKind } from "@/lib/smart-documents";
 import { planJulieInstruction, type JuliePlannedAction } from "@/lib/julie-orchestrator";
 import { createJulieApproval, listJulieApprovals, type JulieMessage } from "@/lib/julie";
+import { createJulieGoal, finishJulieGoal } from "@/lib/julie-runtime";
 
 export type JulieActionResult = { tool: string; status: "completed" | "needs_input" | "failed"; label: string; clientId?: string };
 export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "create_client" | "create_task" | "update_client" | "add_note" | "request_signature" | "answer"; generatedDocumentId?: string; actions?: JulieActionResult[] };
@@ -367,7 +368,7 @@ function commandFor(action: JuliePlannedAction) {
   }
 }
 
-export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = [], executionMode:"automatic"|"approval_all"="automatic"): Promise<JulieExecution> {
+export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = [], executionMode:"automatic"|"approval_all"="automatic",runtime?:{conversationId?:string;workingMemory?:Record<string,unknown>}): Promise<JulieExecution> {
   const arithmetic = normalize(instruction).match(/(?:combien (?:font|fait)|calcule)\s+(-?\d+(?:[.,]\d+)?)\s*([+\-x*\/])\s*(-?\d+(?:[.,]\d+)?)/);
   if (arithmetic) {
     const left = Number(arithmetic[1].replace(",", ".")), right = Number(arithmetic[3].replace(",", "."));
@@ -377,7 +378,7 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   const clients = await listClients();
   const active = selectedClientId ? clients.find((client) => client.id === selectedClientId) : undefined;
   let plan;let planDiagnostic="AI_NOT_CONFIGURED — aucun jeton AI Gateway ou OpenAI disponible.";
-  try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history }); }
+  try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history,workingMemory:runtime?.workingMemory }); }
   catch (error) { planDiagnostic=error instanceof Error?error.message:"Erreur IA inconnue";console.error("Julie planification", {diagnostic:planDiagnostic}); plan = null; }
   if (!plan) {
     const complex=/cr[ée]e|ajoute|modifie|analyse|classe|renomme|g[ée]n[èe]re|signature|envoie/i.test(instruction);
@@ -386,6 +387,7 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
     const safe=await executeLegacyCommand(instruction,selectedClientId);return{...safe,answer:`${friendly}\n\n${safe.answer}`};
   }
   if (plan.clarification && !plan.actions.length) return { answer: plan.clarification, clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification }] };
+  const goalRun=runtime?.conversationId&&plan.actions.length?await createJulieGoal({conversationId:runtime.conversationId,clientId:selectedClientId,objective:instruction,plan:plan.actions,status:executionMode==="approval_all"?"awaiting_approval":"executing"}):null;
   const executions: JulieExecution[] = [];
   let workingClientId=plan.ignoreActiveClient?undefined:selectedClientId;
   const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature","rename_document","move_document","update_task","move_appointment","create_professional_document","edit_professional_document","merge_professional_documents","prepare_complete_case"]);
@@ -397,14 +399,14 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
       if(batchActions.includes(planned)){
         if(!batchApprovalCreated){
           const labels=batchActions.map(item=>item.tool.replaceAll("_"," "));
-          const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Plan Julie à approuver — ${batchActions.length} action(s)`,description:`Actions qui seront exécutées ensemble : ${labels.join("; ")}.`,payload:{plannedActions:batchActions,instruction}});
+          const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Plan Julie à approuver — ${batchActions.length} action(s)`,description:`Actions qui seront exécutées ensemble : ${labels.join("; ")}.`,payload:{plannedActions:batchActions,instruction,conversationId:runtime?.conversationId,goalRunId:goalRun?.id}});
           executions.push({answer:`J’ai regroupé ${batchActions.length} action(s) dans une seule validation :\n${labels.map(label=>`- ${label}`).join("\n")}\n\nUtilisez « Approuver et exécuter tout » pour lancer le plan complet.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:"batch_approval",status:"needs_input",label:approval.title,clientId:workingClientId}]});
           batchApprovalCreated=true;
         }
         continue;
       }
       if(alwaysSensitive.has(planned.tool)||(executionMode==="approval_all"&&mutating.has(planned.tool)&&planned.tool!=="request_signature")){
-        const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:alwaysSensitive.has(planned.tool)?`Action sensible : Julie attend votre confirmation explicite avant toute exécution.`:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction}});
+        const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:alwaysSensitive.has(planned.tool)?`Action sensible : Julie attend votre confirmation explicite avant toute exécution.`:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction,conversationId:runtime?.conversationId,goalRunId:goalRun?.id}});
         executions.push({answer:`J’ai préparé l’action « ${planned.tool.replaceAll("_"," ")} ». Elle attend votre approbation et aucune modification n’a encore été appliquée.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:planned.tool,status:"needs_input",label:approval.title,clientId:workingClientId}]});
         continue;
       }
@@ -416,5 +418,5 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
     }
   }
   if (!executions.length) return { answer: plan.clarification || "Je n'ai identifié aucune action sûre à exécuter. Précisez le client et le résultat attendu.", clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification || "Précision requise" }] };
-  return { answer: [plan.clarification, ...executions.map((item) => item.answer)].filter(Boolean).join("\n\n"), clientIds: [...new Set(executions.flatMap((item) => item.clientIds))], action: executions.at(-1)!.action, generatedDocumentId: executions.find((item) => item.generatedDocumentId)?.generatedDocumentId, actions: executions.flatMap((item) => item.actions || []) };
+  const finalResult={ answer: [plan.clarification, ...executions.map((item) => item.answer)].filter(Boolean).join("\n\n"), clientIds: [...new Set(executions.flatMap((item) => item.clientIds))], action: executions.at(-1)!.action, generatedDocumentId: executions.find((item) => item.generatedDocumentId)?.generatedDocumentId, actions: executions.flatMap((item) => item.actions || []) };const pending=finalResult.actions.some(item=>item.status==="needs_input"),failed=finalResult.actions.some(item=>item.status==="failed");if(goalRun&&!pending)await finishJulieGoal(goalRun.id,failed?"failed":"completed",finalResult,failed?"Une ou plusieurs actions ont échoué.":undefined);return finalResult;
 }
