@@ -193,13 +193,13 @@ function commandFor(action: JuliePlannedAction) {
 export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = []): Promise<JulieExecution> {
   const clients = await listClients();
   const active = selectedClientId ? clients.find((client) => client.id === selectedClientId) : undefined;
-  let plan;
+  let plan;let planDiagnostic="AI_NOT_CONFIGURED — aucun jeton AI Gateway ou OpenAI disponible.";
   try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history }); }
-  catch (error) { console.error("Julie planification", error); plan = null; }
+  catch (error) { planDiagnostic=error instanceof Error?error.message:"Erreur IA inconnue";console.error("Julie planification", {diagnostic:planDiagnostic}); plan = null; }
   if (!plan) {
     const complex=/cr[ée]e|ajoute|modifie|analyse|classe|renomme|g[ée]n[èe]re|signature|envoie/i.test(instruction);
-    if(complex)return{answer:"Le service intelligent de Julie est momentanément indisponible. Certaines actions avancées sont limitées. Je n’ai exécuté aucune modification afin d’éviter une action incorrecte.",clientIds:[],action:"answer",actions:[{tool:"intelligent_service",status:"failed",label:"Action avancée suspendue"}]};
-    const safe=await executeLegacyCommand(instruction,selectedClientId);return{...safe,answer:`Le service intelligent de Julie est momentanément indisponible. Certaines actions avancées sont limitées.\n\n${safe.answer}`};
+    if(complex)return{answer:`Julie n’a pas exécuté cette action avancée. Diagnostic : ${planDiagnostic}`,clientIds:[],action:"answer",actions:[{tool:"intelligent_service",status:"failed",label:`Action suspendue — ${planDiagnostic}`}]};
+    const safe=await executeLegacyCommand(instruction,selectedClientId);return{...safe,answer:`Mode intelligent limité. Diagnostic : ${planDiagnostic}\n\n${safe.answer}`};
   }
   if (plan.clarification && !plan.actions.length) return { answer: plan.clarification, clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification }] };
   const executions: JulieExecution[] = [];

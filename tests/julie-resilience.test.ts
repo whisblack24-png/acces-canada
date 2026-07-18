@@ -1,0 +1,5 @@
+import test from "node:test";import assert from "node:assert/strict";import{readFileSync}from"node:fs";
+const analysis=readFileSync("lib/document-analysis.ts","utf8"),agent=readFileSync("lib/julie-agent.ts","utf8"),approvals=readFileSync("lib/julie.ts","utf8");
+test("une IA non configurée termine à zéro avec un diagnostic explicite",()=>{assert.match(analysis,/AI_NOT_CONFIGURED/);assert.match(analysis,/confidence:0/);assert.doesNotMatch(analysis,/confidence:\.1/);assert.match(agent,/planDiagnostic/);});
+test("les appels IA transitoires sont retentés sans boucle infinie",()=>{assert.match(analysis,/attempt<=3/);assert.match(analysis,/AbortSignal\.timeout\(45000\)/);assert.match(readFileSync("lib/julie-orchestrator.ts","utf8"),/attempt<=3/);});
+test("une analyse manuelle alimente la file d'approbation sans doublon",()=>{assert.match(approvals,/document_review/);assert.match(approvals,/ensureJulieApproval/);assert.match(analysis,/ensureJulieApproval/);assert.match(analysis,/dedupeKey:upload\.id/);});

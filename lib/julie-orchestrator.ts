@@ -45,12 +45,12 @@ export async function planJulieInstruction(input: { instruction: string; activeC
   };
   const history = (input.history || []).slice(-20).map((message) => `${message.role}: ${message.content}`).join("\n");
   const system = `Tu es le planificateur d'actions de Julie, l'assistante administrative d'Accès Canada. Transforme la demande en zéro à huit appels d'outils ordonnés. Ne réponds jamais à partir de connaissances inventées : les réponses sur les dossiers doivent appeler un outil qui lit les données réelles. Une demande qui crée un nouveau client a scope=new_client, ignoreActiveClient=true et ne doit JAMAIS reprendre le client actif ni ses données. Extrais dans arguments de create_client les champs visibles parmi full_name,email,phone,country,service,notes; n'invente rien. Pour un client existant, mets son nom ou sa référence dans clientQuery. Si un renseignement indispensable manque, renseigne clarification et ne planifie pas l'écriture concernée. Les actions officielles ou externes nécessitant validation ne doivent pas être présentées comme déjà envoyées.`;
-  const response = await fetch(auth.url, { method: "POST", headers: { Authorization: `Bearer ${auth.token}`, "Content-Type": "application/json" }, body: JSON.stringify({
+  const requestBody=JSON.stringify({
     model: auth.model,
     messages: [{ role: "system", content: system }, { role: "user", content: `Client actif (simple contexte, jamais une source pour un nouveau client): ${input.activeClient ? `${input.activeClient.name} [${input.activeClient.id}]` : "aucun"}\nHistorique:\n${history || "aucun"}\n\nDemande actuelle:\n${input.instruction}` }],
     response_format: { type: "json_schema", json_schema: { name: "julie_plan", strict: true, schema } },
-  }) });
-  if (!response.ok) throw new Error(`Planification IA indisponible (${response.status}).`);
+  });let response:Response|null=null;let details="";for(let attempt=1;attempt<=3;attempt++){try{response=await fetch(auth.url,{method:"POST",headers:{Authorization:`Bearer ${auth.token}`,"Content-Type":"application/json"},body:requestBody,signal:AbortSignal.timeout(30000)});if(response.ok)break;details=(await response.text()).slice(0,400);if(![408,429,500,502,503,504].includes(response.status))break;}catch(error){details=error instanceof Error?error.message:"Délai dépassé";response=null;}}
+  if (!response?.ok) {const status=response?.status||0,code=status===401||status===403?"AUTHENTIFICATION_IA_INVALIDE":status===429?"QUOTA_IA_ATTEINT":status>=500?"FOURNISSEUR_IA_INDISPONIBLE":status===0?"DELAI_IA_DEPASSE":"REQUETE_IA_REFUSEE";throw new Error(`${code}${status?` (HTTP ${status})`:""}${details?` — ${details}`:""}`);}
   const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const text = body.choices?.[0]?.message?.content;
   if (!text) throw new Error("Le modèle n'a produit aucun plan d'action.");
