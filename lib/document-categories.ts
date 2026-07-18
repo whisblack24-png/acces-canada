@@ -20,7 +20,9 @@ export function documentCategoryLabel(value: string) {
 export const DOCUMENT_MIME_TYPES = [
   "application/pdf", "image/jpeg", "image/png", "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain", "text/csv", "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ] as const;
 export const DOCUMENT_CATEGORY_LABELS: Record<string,string> = Object.fromEntries(DOCUMENT_CATEGORIES.map((item)=>[item.value,item.label]));
-export const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
+export const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,.doc,.docx,.txt,.csv,.xls,.xlsx";
 export const DOCUMENT_MAX_SIZE = 15 * 1024 * 1024;

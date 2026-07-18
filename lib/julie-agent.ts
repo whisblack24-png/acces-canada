@@ -1,23 +1,35 @@
 import "server-only";
 
-import { createClient, listClients, type AdminClient, type ServiceType } from "@/lib/admin-data";
+import { createClient, listClients, updateClient, type AdminClient, type ClientInput, type ServiceType } from "@/lib/admin-data";
 import { createGeneratedDocument } from "@/lib/admin-documents";
 import { analyzeDossier, type AssistantContext } from "@/lib/ai-assistant";
-import { listAppointmentsForEmail } from "@/lib/booking";
+import { listAppointments, listAppointmentsForEmail } from "@/lib/booking";
 import { listClientUploads } from "@/lib/client-portal";
 import { analyzeClientUpload } from "@/lib/document-analysis";
 import { documentFileName, type ClientDocumentType } from "@/lib/pdf-documents";
 import { createAuditLog } from "@/lib/platform-v2";
-import { listClientPayments, requestSignature } from "@/lib/production-workflow";
+import { listClientPayments } from "@/lib/production-workflow";
 import { listCaseProgress, listQuestionnaires } from "@/lib/questionnaires";
-import { addTimelineEvent, createTask, listClientTasks } from "@/lib/crm";
+import { addTimelineEvent, createReminder, createTask, listClientTasks } from "@/lib/crm";
 import { planJulieInstruction, type JuliePlannedAction } from "@/lib/julie-orchestrator";
-import type { JulieMessage } from "@/lib/julie";
+import { createJulieApproval, listJulieApprovals, type JulieMessage } from "@/lib/julie";
 
 export type JulieActionResult = { tool: string; status: "completed" | "needs_input" | "failed"; label: string; clientId?: string };
-export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "create_client" | "create_task" | "request_signature" | "answer"; generatedDocumentId?: string; actions?: JulieActionResult[] };
+export type JulieExecution = { answer: string; clientIds: string[]; action: "summary" | "incomplete" | "analyze_documents" | "generate_document" | "create_client" | "create_task" | "update_client" | "add_note" | "request_signature" | "answer"; generatedDocumentId?: string; actions?: JulieActionResult[] };
 
 function normalize(value: string) { return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase("fr-CA"); }
+function friendlyAiFailure(diagnostic:string){if(/QUOTA_IA_ATTEINT|AI_QUOTA|LIMITE_MENSUELLE/.test(diagnostic))return"Le crédit du service IA est actuellement épuisé. Les autres fonctions d’Accès Canada restent disponibles. Ajoutez des crédits dans la plateforme OpenAI pour réactiver les fonctions de Julie.";if(/AUTHENTIFICATION/.test(diagnostic))return"Le service IA n’est pas authentifié. Les autres fonctions d’Accès Canada restent disponibles pendant la correction de la configuration.";return"Le service intelligent de Julie est momentanément indisponible. Aucune action incomplète n’a été présentée comme réussie.";}
+
+function editableClient(client: AdminClient, changes: Partial<ClientInput>): ClientInput {
+  return {
+    full_name: client.full_name, email: client.email, phone: client.phone || undefined,
+    country: client.country || undefined, service: client.service, status: client.status,
+    file_reference: client.file_reference || undefined, notes: client.notes || undefined,
+    public_notes: client.public_notes || undefined, internal_notes: client.internal_notes || undefined,
+    documents_received: client.documents_received || [], documents_missing: client.documents_missing || [],
+    action_history: client.action_history || [], paid_amount: client.paid_amount || 0, ...changes,
+  };
+}
 
 function findTargets(instruction: string, clients: AdminClient[], selectedId?: string) {
   const query = normalize(instruction);
@@ -78,6 +90,46 @@ async function executeLegacyCommand(instruction: string, selectedClientId?: stri
   }
   const targets = findTargets(instruction, clients, selectedClientId);
 
+  if (/prochain rendez-vous|prochains rendez-vous|rendez-vous a venir/.test(command)) {
+    const appointments = (targets[0] ? await listAppointmentsForEmail(targets[0].email) : await listAppointments({ status: "confirmed" })).filter((item) => item.status === "confirmed" && new Date(item.starts_at) >= new Date()).sort((a, b) => +new Date(a.starts_at) - +new Date(b.starts_at));
+    const next = appointments[0];
+    return { answer: next ? `Le prochain rendez-vous${targets[0] ? ` de ${targets[0].full_name}` : ""} est prévu le ${new Date(next.starts_at).toLocaleString("fr-CA")}.` : `Aucun rendez-vous à venir${targets[0] ? ` pour ${targets[0].full_name}` : ""}.`, clientIds: targets[0] ? [targets[0].id] : [], action: "answer" };
+  }
+
+  if (/approbations?|actions? en attente/.test(command)) {
+    const approvals = await listJulieApprovals();
+    return { answer: approvals.length ? [`${approvals.length} action(s) attendent une approbation :`, ...approvals.slice(0, 20).map((item) => `- ${item.title}`)].join("\n") : "Aucune action n’attend une approbation.", clientIds: [...new Set(approvals.map((item) => item.client_id).filter((id): id is string => Boolean(id)))], action: "answer" };
+  }
+
+  if (/consultation generale|change.*type|modifie.*type|mets.*dossier.*(visa|permis|consultation|residence)/.test(command)) {
+    const client = targets[0];
+    if (!client) return { answer: "Sélectionnez ou nommez le client dont le type de dossier doit être modifié.", clientIds: [], action: "update_client" };
+    const service = /consultation generale/.test(command) ? "consultation_generale" : /visa/.test(command) ? "visa_visiteur" : /permis.*etude/.test(command) ? "permis_etudes" : /permis.*travail/.test(command) ? "permis_travail" : /residence/.test(command) ? "residence_permanente" : "autre";
+    const note = service === "consultation_generale" ? "Type temporaire confirmé dans la conversation avec Julie; le besoin définitif sera précisé après l’entretien avec le client." : `Type de dossier modifié par Julie : ${service.replaceAll("_", " ")}.`;
+    await updateClient(client.id, editableClient(client, { service, internal_notes: [client.internal_notes, note].filter(Boolean).join("\n\n"), action_history: [...(client.action_history || []), { date: new Date().toISOString(), action: note }] }));
+    await Promise.all([addTimelineEvent(client.id, "Type de dossier modifié", note, "julie"), createAuditLog({ actorId: "julie", actorType: "system", action: "update", entityType: "admin_clients", entityId: client.id, clientId: client.id, summary: note, metadata: { oldValue: client.service, newValue: service } })]);
+    return { answer: `C’est fait. Le dossier de ${client.full_name} est maintenant classé comme « ${service.replaceAll("_", " ")} ». J’ai ajouté une note interne et le type pourra être modifié plus tard.`, clientIds: [client.id], action: "update_client" };
+  }
+
+  if (/ajoute.*note|cree.*note|note interne/.test(command)) {
+    const client = targets[0];
+    if (!client) return { answer: "Sélectionnez ou nommez le client auquel ajouter la note.", clientIds: [], action: "add_note" };
+    const note = instruction.replace(/^(julie[,.\s]*)?/i, "").replace(/^.*?note(?: interne)?\s*(?:pour\s+[^:,.]+)?[:\s-]*/i, "").trim().slice(0, 4000);
+    if (note.length < 3) return { answer: "Indiquez le contenu de la note interne.", clientIds: [client.id], action: "add_note" };
+    await updateClient(client.id, editableClient(client, { internal_notes: [client.internal_notes, note].filter(Boolean).join("\n\n"), action_history: [...(client.action_history || []), { date: new Date().toISOString(), action: `Note interne ajoutée : ${note}` }] }));
+    await addTimelineEvent(client.id, "Note interne ajoutée par Julie", note, "julie");
+    return { answer: `C’est fait. J’ai ajouté la note interne au dossier de ${client.full_name}.`, clientIds: [client.id], action: "add_note" };
+  }
+
+  if (/cree.*rappel|ajoute.*rappel|rappelle-moi/.test(command)) {
+    const client = targets[0];
+    if (!client) return { answer: "Sélectionnez ou nommez le client auquel rattacher le rappel.", clientIds: [], action: "create_task" };
+    const remindAt = new Date(); remindAt.setDate(remindAt.getDate() + (/demain/.test(command) ? 1 : 7)); remindAt.setHours(9, 0, 0, 0);
+    const title = instruction.replace(/^(julie[,.\s]*)?/i, "").trim().slice(0, 240);
+    const reminder = await createReminder(client.id, { title, message: title, remindAt: remindAt.toISOString() });
+    return { answer: `J’ai créé le rappel « ${reminder.title} » pour ${client.full_name}, prévu le ${remindAt.toLocaleString("fr-CA")}.`, clientIds: [client.id], action: "create_task" };
+  }
+
   if (/dossiers? (incomplets?|a completer)|pieces? manquantes?/.test(command)) {
     const checked = await Promise.all(clients.map(async (client) => ({ client, analysis: analyzeDossier(await contextFor(client)) })));
     const incomplete = checked.filter(({ analysis }) => analysis.missingDocuments.length > 0);
@@ -106,8 +158,8 @@ async function executeLegacyCommand(instruction: string, selectedClientId?: stri
     const client = targets[0];
     if (!client) return { answer: "Sélectionnez ou nommez le client concerné par la signature.", clientIds: [], action: "request_signature" };
     const type = documentType || "convention";
-    const signature = await requestSignature(client, type);
-    return { answer: `La demande de signature pour « ${signature.document_label} » est enregistrée pour ${client.full_name}. Le client peut la signer dans son espace sécurisé; une demande identique déjà en attente n’est jamais dupliquée.`, clientIds: [client.id], action: "request_signature" };
+    const approval = await createJulieApproval({clientId:client.id,actionType:"signature_electronique",title:`Signature à approuver — ${client.full_name}`,description:`Julie a préparé la demande de signature pour ${type.replaceAll("_"," ")}.`,payload:{documentType:type}});
+    return { answer: `La demande de signature pour ${client.full_name} est prête. Elle attend votre approbation avant d’être rendue disponible au client.`, clientIds: [client.id], action: "request_signature", actions:[{tool:"request_signature",status:"needs_input",label:`Approbation requise : ${approval.title}`,clientId:client.id}] };
   }
 
   if (/ajoute.*tache|cree.*tache|rappelle.*de|il faut/.test(command)) {
@@ -161,9 +213,8 @@ async function createClientFromPlan(action: JuliePlannedAction): Promise<JulieEx
   const phone = stringArg(action, "phone");
   const country = stringArg(action, "country");
   const serviceRaw = stringArg(action, "service");
-  const allowed = new Set<ServiceType>(["visa_visiteur", "permis_etudes", "permis_travail", "residence_permanente", "autre"]);
-  const service = allowed.has(serviceRaw as ServiceType) ? serviceRaw as ServiceType : "autre";
-  const missing = [!fullName && "le nom complet", !email && "l'adresse courriel", service === "autre" && "le type de dossier"].filter(Boolean);
+  const service = normalize(serviceRaw).replace(/\s+/g, "_") || "";
+  const missing = [!fullName && "le nom complet", !email && "l'adresse courriel", !service && "le type de dossier"].filter(Boolean);
   if (missing.length) return { answer: `Il me manque ${missing.join(", ")} avant de créer ce dossier. Je n'ai réutilisé aucune donnée du client précédemment sélectionné.`, clientIds: [], action: "create_client", actions: [{ tool: action.tool, status: "needs_input", label: `Création suspendue : ${missing.join(", ")}` }] };
   const clients = await listClients();
   const duplicate = clients.find((client) => client.email.toLowerCase() === email || normalize(client.full_name) === normalize(fullName) || (phone && client.phone && client.phone.replace(/\D/g, "") === phone.replace(/\D/g, "")));
@@ -184,13 +235,24 @@ function commandFor(action: JuliePlannedAction) {
     case "analyze_documents": return `Analyse, classe et renomme les documents${client}`;
     case "generate_document": return `Génère ${stringArg(action, "document_type") || "une lettre explicative"}${client}`;
     case "create_task": return `Crée une tâche${client}: ${stringArg(action, "title")}`;
+    case "create_reminder": return `Crée un rappel${client}: ${stringArg(action, "title")} ${stringArg(action, "desired_date")}`;
+    case "update_client": return `Modifie le type du dossier${client} en ${stringArg(action, "service") || stringArg(action, "status")}`;
+    case "add_note": return `Ajoute une note interne${client}: ${stringArg(action, "notes")}`;
+    case "list_appointments": return `Quel est le prochain rendez-vous${client} ?`;
+    case "list_pending_approvals": return "Affiche les actions en attente d’approbation";
     case "request_signature": return `Fais signer ${stringArg(action, "document_type") || "la convention"}${client}`;
     case "recommend": return `Analyse et recommande les prochaines étapes${client}`;
     default: return `Consulte et réponds à propos du dossier${client}`;
   }
 }
 
-export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = []): Promise<JulieExecution> {
+export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = [], executionMode:"automatic"|"approval_all"="automatic"): Promise<JulieExecution> {
+  const arithmetic = normalize(instruction).match(/(?:combien (?:font|fait)|calcule)\s+(-?\d+(?:[.,]\d+)?)\s*([+\-x*\/])\s*(-?\d+(?:[.,]\d+)?)/);
+  if (arithmetic) {
+    const left = Number(arithmetic[1].replace(",", ".")), right = Number(arithmetic[3].replace(",", "."));
+    const result = arithmetic[2] === "+" ? left + right : arithmetic[2] === "-" ? left - right : /[x*]/.test(arithmetic[2]) ? left * right : right === 0 ? NaN : left / right;
+    return { answer: Number.isFinite(result) ? String(result) : "Ce calcul n’est pas défini.", clientIds: [], action: "answer", actions: [{ tool: "local_calculator", status: "completed", label: "Calcul effectué localement, sans appel OpenAI." }] };
+  }
   const clients = await listClients();
   const active = selectedClientId ? clients.find((client) => client.id === selectedClientId) : undefined;
   let plan;let planDiagnostic="AI_NOT_CONFIGURED — aucun jeton AI Gateway ou OpenAI disponible.";
@@ -198,14 +260,21 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   catch (error) { planDiagnostic=error instanceof Error?error.message:"Erreur IA inconnue";console.error("Julie planification", {diagnostic:planDiagnostic}); plan = null; }
   if (!plan) {
     const complex=/cr[ée]e|ajoute|modifie|analyse|classe|renomme|g[ée]n[èe]re|signature|envoie/i.test(instruction);
-    if(complex)return{answer:`Julie n’a pas exécuté cette action avancée. Diagnostic : ${planDiagnostic}`,clientIds:[],action:"answer",actions:[{tool:"intelligent_service",status:"failed",label:`Action suspendue — ${planDiagnostic}`}]};
-    const safe=await executeLegacyCommand(instruction,selectedClientId);return{...safe,answer:`Mode intelligent limité. Diagnostic : ${planDiagnostic}\n\n${safe.answer}`};
+    const friendly=friendlyAiFailure(planDiagnostic);
+    if(complex)return{answer:friendly,clientIds:[],action:"answer",actions:[{tool:"intelligent_service",status:"failed",label:friendly}]};
+    const safe=await executeLegacyCommand(instruction,selectedClientId);return{...safe,answer:`${friendly}\n\n${safe.answer}`};
   }
   if (plan.clarification && !plan.actions.length) return { answer: plan.clarification, clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification }] };
   const executions: JulieExecution[] = [];
   let workingClientId=plan.ignoreActiveClient?undefined:selectedClientId;
   for (const planned of plan.actions) {
     try {
+      const mutating=new Set(["create_client","analyze_documents","generate_document","create_task","create_reminder","update_client","add_note","request_signature"]);
+      if(executionMode==="approval_all"&&mutating.has(planned.tool)&&planned.tool!=="request_signature"){
+        const approval=await createJulieApproval({clientId:workingClientId,actionType:"internal_action",title:`Action Julie à approuver — ${planned.tool.replaceAll("_"," ")}`,description:`Mode validation complète : cette action a été préparée mais pas exécutée.`,payload:{planned,instruction}});
+        executions.push({answer:`J’ai préparé l’action « ${planned.tool.replaceAll("_"," ")} ». Elle attend votre approbation et aucune modification n’a encore été appliquée.`,clientIds:workingClientId?[workingClientId]:[],action:"answer",actions:[{tool:planned.tool,status:"needs_input",label:approval.title,clientId:workingClientId}]});
+        continue;
+      }
       const execution = planned.tool === "create_client" ? await createClientFromPlan(planned) : await executeLegacyCommand(commandFor(planned), workingClientId);
       if(execution.clientIds[0])workingClientId=execution.clientIds[0];
       executions.push({ ...execution, actions: execution.actions || [{ tool: planned.tool, status: "completed", label: execution.answer.split("\n")[0], clientId: execution.clientIds[0] }] });
