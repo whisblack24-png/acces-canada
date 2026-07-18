@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { getAdminIdentity, isAdminAuthenticated } from "@/lib/admin-auth";
 import { executeJulieCommand } from "@/lib/julie-agent";
 import { getJulieConversation, listJulieMessages, saveJulieMessage, setJulieConversationClient, setJulieConversationMode } from "@/lib/julie";
-import { updateJulieWorkingMemory } from "@/lib/julie-runtime";
+import { getJulieRuntimeState, listJulieGlobalMemory, rememberJulieOutcome, updateJulieWorkingMemory } from "@/lib/julie-runtime";
 
 export async function GET() {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   const identity = await getAdminIdentity();
   if (!identity?.id) return NextResponse.json({ error: "Identité introuvable." }, { status: 401 });
   const conversation = await getJulieConversation(identity.id);
-  return NextResponse.json({ conversationId: conversation.id, clientId: conversation.client_id, executionMode: conversation.execution_mode || "automatic", memory: conversation.working_memory || {}, messages: await listJulieMessages(conversation.id) });
+  const[messages,runtime]=await Promise.all([listJulieMessages(conversation.id),getJulieRuntimeState(conversation.id)]);return NextResponse.json({ conversationId: conversation.id, clientId: conversation.client_id, executionMode: conversation.execution_mode || "automatic", memory: conversation.working_memory || {},runtime,messages });
 }
 
 export async function POST(request: Request) {
@@ -26,11 +26,11 @@ export async function POST(request: Request) {
     if (body.executionMode && body.executionMode !== conversation.execution_mode) await setJulieConversationMode(conversation.id, body.executionMode);
     await saveJulieMessage(conversation.id, "staff", message);
     const mode=body.executionMode||conversation.execution_mode||"automatic";
-    const execution = await executeJulieCommand(message, activeClientId, history, mode, {conversationId:conversation.id,workingMemory:conversation.working_memory||{}});
+    const globalMemory=await listJulieGlobalMemory(activeClientId);const execution = await executeJulieCommand(message, activeClientId, history, mode, {conversationId:conversation.id,workingMemory:conversation.working_memory||{},globalMemory});
     if (execution.action !== "create_client" || execution.clientIds.length) await setJulieConversationClient(conversation.id, execution.clientIds[0]);
     await saveJulieMessage(conversation.id, "julie", execution.answer);
     await updateJulieWorkingMemory(conversation.id,{activeClientId:execution.clientIds[0]||activeClientId,lastUserRequest:message,lastAnswer:execution.answer,lastActions:execution.actions||[],generatedDocumentIds:execution.generatedDocumentId?[execution.generatedDocumentId]:undefined});
-    return NextResponse.json({ ...execution, conversationId: conversation.id });
+    await rememberJulieOutcome({conversationId:conversation.id,clientId:execution.clientIds[0]||activeClientId,instruction:message,answer:execution.answer,actions:execution.actions});const runtime=await getJulieRuntimeState(conversation.id);return NextResponse.json({ ...execution, conversationId: conversation.id,runtime });
   } catch (error) {
     console.error("Julie", error);
     return NextResponse.json({ error: "Julie n’a pas pu traiter cette demande. Aucune action incomplète n’a été présentée comme réussie." }, { status: 500 });

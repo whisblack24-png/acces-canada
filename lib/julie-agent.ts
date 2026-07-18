@@ -368,7 +368,7 @@ function commandFor(action: JuliePlannedAction) {
   }
 }
 
-export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = [], executionMode:"automatic"|"approval_all"="automatic",runtime?:{conversationId?:string;workingMemory?:Record<string,unknown>}): Promise<JulieExecution> {
+export async function executeJulieCommand(instruction: string, selectedClientId?: string, history: JulieMessage[] = [], executionMode:"automatic"|"approval_all"="automatic",runtime?:{conversationId?:string;workingMemory?:Record<string,unknown>;globalMemory?:Array<{memory_type:string;content:string}>}): Promise<JulieExecution> {
   const arithmetic = normalize(instruction).match(/(?:combien (?:font|fait)|calcule)\s+(-?\d+(?:[.,]\d+)?)\s*([+\-x*\/])\s*(-?\d+(?:[.,]\d+)?)/);
   if (arithmetic) {
     const left = Number(arithmetic[1].replace(",", ".")), right = Number(arithmetic[3].replace(",", "."));
@@ -378,7 +378,7 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   const clients = await listClients();
   const active = selectedClientId ? clients.find((client) => client.id === selectedClientId) : undefined;
   let plan;let planDiagnostic="AI_NOT_CONFIGURED — aucun jeton AI Gateway ou OpenAI disponible.";
-  try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history,workingMemory:runtime?.workingMemory }); }
+  try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history,workingMemory:runtime?.workingMemory,globalMemory:runtime?.globalMemory }); }
   catch (error) { planDiagnostic=error instanceof Error?error.message:"Erreur IA inconnue";console.error("Julie planification", {diagnostic:planDiagnostic}); plan = null; }
   if (!plan) {
     const complex=/cr[ée]e|ajoute|modifie|analyse|classe|renomme|g[ée]n[èe]re|signature|envoie/i.test(instruction);
