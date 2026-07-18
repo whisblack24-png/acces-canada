@@ -178,9 +178,9 @@ export default async function ClientDossierPage({ params }: PageProps) {
               <SecureMessages initialMessages={messages} adminClientId={client.id} />
             </Panel>
 
-            <Panel title="Gestionnaire de documents" icon={<FileCheck2 className="h-5 w-5" />}>
+            <div id="documents" className="scroll-mt-24"><Panel title="Gestionnaire de documents" icon={<FileCheck2 className="h-5 w-5" />}>
               <ClientUploadedDocumentsAdmin clientId={client.id} documents={uploadedDocuments} analyses={documentAnalyses} />
-            </Panel>
+            </Panel></div>
 
             <Panel title="Documents générés par Accès Canada" icon={<FileText className="h-5 w-5" />}>
               <GeneratedDocumentVersions documents={generatedDocuments} />
@@ -228,12 +228,12 @@ function DocumentList({ items, empty, checked = false }: { items: string[]; empt
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item} className="flex items-center gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74">
+        <a key={item} href="#documents" className="flex items-center gap-3 rounded-2xl bg-ivory p-4 font-bold text-navy/74 transition hover:bg-gold/15">
           <span className={`grid h-6 w-6 place-items-center rounded-full text-xs ${checked ? "bg-gold text-navy" : "bg-canada text-white"}`}>
             {checked ? "✓" : "!"}
           </span>
           {item}
-        </div>
+        </a>
       ))}
     </div>
   );

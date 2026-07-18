@@ -1,0 +1,9 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { classifyExtractedDocument, normalizedDocumentName } from "../lib/document-intelligence.ts";
+
+test("reconnaît un passeport par son contenu et non son nom",()=>{const result=classifyExtractedDocument("PASSPORT CANADA\nName: Marie Louise Test\nP<CANTEST<<MARIE<LOUISE<<<<<<<<", "scan-001.pdf", "Marie Louise Test");assert.equal(result.suggested_category,"passeport");assert.equal(result.extracted_fields.holder_role,"client");assert.match(result.suggested_name,/Passeport_Marie_Louise_Test\.pdf/);});
+test("classe le relevé du client dans sa situation financière",()=>{const result=classifyExtractedDocument("BANK STATEMENT\nAccount holder: Jean Paul Test\nOpening balance CAD 1200\nClosing balance CAD 1800", "image.png", "Jean Paul Test");assert.equal(result.suggested_category,"situation_financiere");assert.equal(result.extracted_fields.holder_role,"client");});
+test("sépare le relevé d'un titulaire différent comme garant à confirmer",()=>{const result=classifyExtractedDocument("RELEVE BANCAIRE\nTitulaire: Alice Garant Test\nSolde final CAD 5000", "releve.pdf", "Jean Paul Test");assert.equal(result.suggested_category,"garant_financier");assert.equal(result.extracted_fields.holder_role,"garant_a_confirmer");assert.match(result.suggested_name,/Garant_Alice_Garant_Test/);});
+test("un document ambigu reste à vérifier",()=>{const result=classifyExtractedDocument("Contenu illisible 123", "lettre.pdf", "Jean Test");assert.equal(result.suggested_category,"a_verifier");assert.ok(result.confidence<.65);});
+test("le renommage n'invente aucune période",()=>{const name=normalizedDocumentName({detected_type:"Releve bancaire",extracted_fields:{holder_name:"Jean Test",holder_role:"client"}},"source.pdf");assert.equal(name,"Releve_bancaire_Jean_Test.pdf");assert.doesNotMatch(name,/2026/);});

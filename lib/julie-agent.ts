@@ -196,12 +196,18 @@ export async function executeJulieCommand(instruction: string, selectedClientId?
   let plan;
   try { plan = await planJulieInstruction({ instruction, activeClient: active ? { id: active.id, name: active.full_name } : null, history }); }
   catch (error) { console.error("Julie planification", error); plan = null; }
-  if (!plan) return executeLegacyCommand(instruction, selectedClientId);
+  if (!plan) {
+    const complex=/cr[ée]e|ajoute|modifie|analyse|classe|renomme|g[ée]n[èe]re|signature|envoie/i.test(instruction);
+    if(complex)return{answer:"Le service intelligent de Julie est momentanément indisponible. Certaines actions avancées sont limitées. Je n’ai exécuté aucune modification afin d’éviter une action incorrecte.",clientIds:[],action:"answer",actions:[{tool:"intelligent_service",status:"failed",label:"Action avancée suspendue"}]};
+    const safe=await executeLegacyCommand(instruction,selectedClientId);return{...safe,answer:`Le service intelligent de Julie est momentanément indisponible. Certaines actions avancées sont limitées.\n\n${safe.answer}`};
+  }
   if (plan.clarification && !plan.actions.length) return { answer: plan.clarification, clientIds: [], action: "answer", actions: [{ tool: "clarification", status: "needs_input", label: plan.clarification }] };
   const executions: JulieExecution[] = [];
+  let workingClientId=plan.ignoreActiveClient?undefined:selectedClientId;
   for (const planned of plan.actions) {
     try {
-      const execution = planned.tool === "create_client" ? await createClientFromPlan(planned) : await executeLegacyCommand(commandFor(planned), plan.ignoreActiveClient ? undefined : selectedClientId);
+      const execution = planned.tool === "create_client" ? await createClientFromPlan(planned) : await executeLegacyCommand(commandFor(planned), workingClientId);
+      if(execution.clientIds[0])workingClientId=execution.clientIds[0];
       executions.push({ ...execution, actions: execution.actions || [{ tool: planned.tool, status: "completed", label: execution.answer.split("\n")[0], clientId: execution.clientIds[0] }] });
     } catch (error) {
       executions.push({ answer: error instanceof Error ? error.message : "Action impossible.", clientIds: [], action: "answer", actions: [{ tool: planned.tool, status: "failed", label: error instanceof Error ? error.message : "Action impossible" }] });

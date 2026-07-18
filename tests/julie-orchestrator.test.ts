@@ -14,7 +14,8 @@ test("Julie utilise un plan d'outils structuré produit par le modèle",()=>{
 test("la création d'un nouveau client isole le client actif et contrôle les doublons",()=>{
   assert.match(orchestrator,/scope === "new_client"/);
   assert.match(orchestrator,/ignoreActiveClient = true/);
-  assert.match(agent,/plan\.ignoreActiveClient \? undefined : selectedClientId/);
+  assert.match(agent,/workingClientId=plan\.ignoreActiveClient\?undefined:selectedClientId/);
+  assert.match(agent,/workingClientId=execution\.clientIds\[0\]/);
   assert.match(agent,/Doublon potentiel à confirmer/);
 });
 

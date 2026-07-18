@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { deleteClientFile, renameClientUpload } from "@/lib/client-portal";
+import { reconcileClientDocumentState } from "@/lib/document-state";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,7 @@ export async function DELETE(request: Request, context: Context) {
   try {
     const deleted = await deleteClientFile(clientId, id);
     if (!deleted) return NextResponse.json({ message: "Document introuvable." }, { status: 404 });
+    await reconcileClientDocumentState(clientId);
     return NextResponse.json({ message: "Document supprime." });
   } catch (error) {
     console.error("Erreur suppression document client:", error);

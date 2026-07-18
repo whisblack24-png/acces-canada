@@ -38,8 +38,8 @@ export async function planJulieInstruction(input: { instruction: string; activeC
       clarification: { type: "string" },
       actions: { type: "array", maxItems: 8, items: { type: "object", additionalProperties: false, properties: {
         tool: { type: "string", enum: tools }, clientQuery: { type: "string" }, arguments: { type: "object", additionalProperties: false, properties: {
-          full_name: { type: "string" }, email: { type: "string" }, phone: { type: "string" }, country: { type: "string" }, service: { type: "string" }, notes: { type: "string" }, title: { type: "string" }, document_type: { type: "string" }, question: { type: "string" },
-        }, required: ["full_name", "email", "phone", "country", "service", "notes", "title", "document_type", "question"] },
+          full_name: { type: "string" }, email: { type: "string" }, phone: { type: "string" }, country: { type: "string" }, service: { type: "string" }, notes: { type: "string" }, desired_date: { type: "string" }, title: { type: "string" }, document_type: { type: "string" }, question: { type: "string" },
+        }, required: ["full_name", "email", "phone", "country", "service", "notes", "desired_date", "title", "document_type", "question"] },
       }, required: ["tool", "clientQuery", "arguments"] } },
     }, required: ["scope", "ignoreActiveClient", "clarification", "actions"],
   };

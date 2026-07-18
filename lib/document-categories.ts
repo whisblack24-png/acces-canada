@@ -1,4 +1,5 @@
 export const DOCUMENT_CATEGORIES = [
+  { value: "a_verifier", label: "Document à vérifier" },
   { value: "identite", label: "Identité" },
   { value: "passeport", label: "Passeport" },
   { value: "refus_ircc", label: "Refus IRCC" },
@@ -20,5 +21,6 @@ export const DOCUMENT_MIME_TYPES = [
   "application/pdf", "image/jpeg", "image/png", "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
+export const DOCUMENT_CATEGORY_LABELS: Record<string,string> = Object.fromEntries(DOCUMENT_CATEGORIES.map((item)=>[item.value,item.label]));
 export const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,.doc,.docx";
 export const DOCUMENT_MAX_SIZE = 15 * 1024 * 1024;

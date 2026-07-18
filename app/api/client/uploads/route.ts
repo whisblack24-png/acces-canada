@@ -1,8 +1,9 @@
 ﻿import { NextResponse } from "next/server";
 import { getClientSession } from "@/lib/client-auth";
-import { createClientUpload, listClientUploads, markClientUploadReceived, replaceClientFile, uploadClientFile } from "@/lib/client-portal";
+import { createClientUpload, listClientUploads, replaceClientFile, uploadClientFile } from "@/lib/client-portal";
 import { DOCUMENT_CATEGORY_VALUES, DOCUMENT_MAX_SIZE, DOCUMENT_MIME_TYPES } from "@/lib/document-categories";
 import { analyzeClientUpload } from "@/lib/document-analysis";
+import { reconcileClientDocumentState } from "@/lib/document-state";
 
 export const runtime = "nodejs";
 
@@ -27,8 +28,8 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file");
-    const requestedCategory = String(formData.get("category") || "correspondance");
-    const category = DOCUMENT_CATEGORY_VALUES.has(requestedCategory) ? requestedCategory : "correspondance";
+    const requestedCategory = String(formData.get("category") || "a_verifier");
+    const category = DOCUMENT_CATEGORY_VALUES.has(requestedCategory) ? requestedCategory : "a_verifier";
     const replaceId = String(formData.get("replaceId") || "").trim();
     if (!(file instanceof File)) {
       return NextResponse.json({ message: "Fichier requis." }, { status: 400 });
@@ -50,9 +51,8 @@ export async function POST(request: Request) {
             uploaded_by: `Client · ${session.email}`,
           });
         })();
-    await markClientUploadReceived(session.clientId, file.name);
-
     const analysis=await analyzeClientUpload(upload).catch(error=>{console.error("Analyse documentaire Julie:",error);return null;});
+    if(!analysis)await reconcileClientDocumentState(session.clientId);
     return NextResponse.json({ upload,analysis }, { status: 201 });
   } catch (error) {
     console.error("Erreur upload client:", error);

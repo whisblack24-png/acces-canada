@@ -4,6 +4,7 @@ import { DOCUMENT_CATEGORY_VALUES, DOCUMENT_MAX_SIZE, DOCUMENT_MIME_TYPES } from
 import { createClientUpload, listAllClientUploads, replaceClientFile, uploadClientFile } from "@/lib/client-portal";
 import { analyzeClientUpload } from "@/lib/document-analysis";
 import { listClients } from "@/lib/admin-data";
+import { reconcileClientDocumentState } from "@/lib/document-state";
 
 export const runtime = "nodejs";
 const allowedTypes = new Set<string>(DOCUMENT_MIME_TYPES);
@@ -21,8 +22,8 @@ export async function POST(request: Request) {
     const files = [...formData.getAll("files"), ...formData.getAll("file")].filter((value): value is File => value instanceof File);
     let clientId = String(formData.get("clientId") || "").trim();
     const replaceId = String(formData.get("replaceId") || "").trim();
-    const requestedCategory = String(formData.get("category") || "correspondance");
-    const category = DOCUMENT_CATEGORY_VALUES.has(requestedCategory) ? requestedCategory : "correspondance";
+    const requestedCategory = String(formData.get("category") || "a_verifier");
+    const category = DOCUMENT_CATEGORY_VALUES.has(requestedCategory) ? requestedCategory : "a_verifier";
     if (!files.length) return NextResponse.json({ message: "Au moins un fichier est requis." }, { status: 400 });
     if (!clientId) {
       const haystack = files.map((file) => file.name.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()).join(" ");
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
           });
         })();
     const analysis=await analyzeClientUpload(upload).catch(error=>{console.error("Analyse documentaire Julie:",error);return null;});
+    if(!analysis)await reconcileClientDocumentState(clientId);
     uploads.push({ ...upload, analysis });
     }
     return NextResponse.json({ upload: uploads[0], uploads, resolvedClientId: clientId }, { status: 201 });
